@@ -3,787 +3,1133 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#06161a">
+<meta name="theme-color" content="#165f80">
 <title>Blip Panic</title>
-<meta name="description" content="Grab the gems, dodge everything else. A fast arcade dodge game for mouse, touch and controller.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%233ff2e6'/%3E%3Ccircle cx='16' cy='16' r='10' fill='%23f2fffd'/%3E%3Crect x='11' y='13' width='3' height='5' fill='%2304110f'/%3E%3Crect x='18' y='13' width='3' height='5' fill='%2304110f'/%3E%3C/svg%3E">
+<meta name="description" content="Dodge the bubbles, grab the gems. A fast arcade dodge game for mouse, touch, keyboard and controller.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2300e5ff' opacity='.5'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23fff' stroke='%2300e5ff' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Ubuntu:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+  /* Ported from the Roblox version (Config.Theme). Layout: canvas = background + arena; DOM = menu, HUD, cards. */
   :root {
-    --bg0: #04110f; --bg1: #0a2a2c; --panel: #0f3236; --panel2: #134046; --line: #1e5a60;
-    --cyan: #3ff2e6; --lime: #b6ff4a; --white: #f2fffd; --dim: #8fb9b5; --red: #ff4f6d;
-    --pink: #ff5fd2; --gold: #ffd84a; --green: #36d66b; --greenDark: #1d8f45;
+    color-scheme: dark;
+    --ink: #061420; --panel: rgba(8,26,44,.88); --panelLine: rgba(255,255,255,.15);
+    --white: #ffffff; --yellow: #ffd60a; --orange: #ff8020; --pink: #ff4070; --cyan: #00e5ff;
+    --green: #6ef05a; --muted: #96c4ce; --play: #6eeb46; --playBase: #428c2a; --sec: #224268; --secBase: #14283e;
     --title: "Press Start 2P", ui-monospace, monospace;
     --body: "Ubuntu", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg0); color: var(--white);
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #165f80; color: var(--white);
     font-family: var(--body); user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
-  #game { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
-  .layer { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    pointer-events: none; }
-  .layer > * { pointer-events: auto; }
+  body.playing.mouse { cursor: crosshair; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .layer { position: fixed; inset: 0; pointer-events: none;
+    padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .layer * { pointer-events: auto; }
   .hidden { display: none !important; }
-  .panel { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 3px solid var(--line);
-    border-radius: 18px; box-shadow: 0 8px 0 #031012, 0 18px 40px #0008; }
-  h1.logo { font-family: var(--title); font-size: clamp(26px, 6.5vw, 64px); margin: 0 0 6px; line-height: 1.15; text-align: center;
-    background: linear-gradient(90deg, var(--cyan), var(--lime)); -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 4px 0 #031012); letter-spacing: 2px; }
-  .sub { color: var(--dim); text-align: center; margin: 0 0 18px; font-size: clamp(14px, 2.2vw, 18px); }
-  .btn { font-family: var(--title); font-size: clamp(14px, 2.4vw, 20px); color: var(--white); border: 0; cursor: pointer;
-    border-radius: 14px; padding: 16px 28px; min-height: 60px; min-width: 60px; background: var(--green);
-    box-shadow: 0 6px 0 var(--greenDark); transition: transform .08s, box-shadow .08s, filter .1s; letter-spacing: 1px; }
-  .btn:hover, .btn.focus { filter: brightness(1.12); transform: scale(1.04); }
-  .btn:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--greenDark); }
-  .btn.secondary { background: var(--panel2); box-shadow: 0 6px 0 #062022; border: 2px solid var(--line); }
-  .btn.secondary:active { box-shadow: 0 1px 0 #062022; }
-  .btn.small { font-size: 12px; padding: 10px 14px; min-height: 48px; }
-  .btn.focus { outline: 3px solid var(--lime); outline-offset: 3px; }
+  .panel { background: var(--panel); border: 1px solid var(--panelLine); border-radius: 16px; }
+  .ink { text-shadow: 3px 0 var(--ink), -3px 0 var(--ink), 0 3px var(--ink), 0 -3px var(--ink), 3px 3px var(--ink), -3px -3px var(--ink), 3px -3px var(--ink), -3px 3px var(--ink); }
+  .pix { image-rendering: pixelated; display: inline-block; vertical-align: middle; }
 
-  /* Menu */
-  #menu { flex-direction: column; overflow-y: auto; }
-  .menuWrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; width: min(980px, 100%); align-items: start; }
-  .menuMain { display: flex; flex-direction: column; align-items: center; padding: 22px 18px; }
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; margin-top: 20px; }
-  .tile { background: var(--bg1); border: 2px solid var(--line); border-radius: 12px; padding: 10px 6px; text-align: center; }
-  .tile canvas { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto 6px; }
-  .tile b { display: block; font-family: var(--title); font-size: 10px; color: var(--lime); margin-bottom: 4px; }
-  .tile span { font-size: 13px; color: var(--dim); }
-  .tilesHead { font-family: var(--title); font-size: 11px; color: var(--dim); margin-top: 22px; letter-spacing: 1px; }
-  .side { display: flex; flex-direction: column; gap: 14px; }
-  .board { padding: 16px; }
-  .board h2, .shop h2 { font-family: var(--title); font-size: 13px; margin: 0 0 12px; color: var(--cyan); letter-spacing: 1px; }
-  .board ol { list-style: none; margin: 0; padding: 0; }
-  .board li { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 8px; font-size: 15px; }
-  .board li:nth-child(odd) { background: #ffffff08; }
-  .board li .r { color: var(--dim); width: 28px; }
-  .board li .s { font-weight: 700; }
-  .board .empty { color: var(--dim); font-size: 14px; padding: 6px 2px; }
-  .best { margin-top: 10px; color: var(--dim); font-size: 14px; }
-  .best b { color: var(--gold); }
-  .shop { padding: 16px; }
-  .gemCount { float: right; font-family: var(--title); font-size: 12px; color: var(--cyan); }
-  .skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
-  .skin { background: var(--bg1); border: 2px solid var(--line); border-radius: 12px; padding: 8px 4px; text-align: center; cursor: pointer;
-    font-size: 12px; color: var(--dim); min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-  .skin .dot { width: 26px; height: 26px; border-radius: 50%; }
-  .skin.on { border-color: var(--lime); color: var(--lime); }
-  .skin.locked { opacity: .75; }
+  /* Chunky arcade button: coloured face over a darker base it presses into. */
+  .btn { position: relative; border: 0; padding: 0; background: none; cursor: pointer; font-family: var(--title); color: var(--ink);
+    --face: var(--play); --base: var(--playBase); transition: transform .1s ease-out; }
+  .btn::before { content: ""; position: absolute; inset: 5px 0 -5px 0; background: var(--base); border-radius: 18px; }
+  .btn > span { position: relative; display: flex; align-items: center; justify-content: center; gap: .5em; height: 100%;
+    background: var(--face); border-radius: 18px; padding: 0 1em; transition: filter .1s, transform .06s; }
+  .btn:hover, .btn.focus { transform: scale(1.04); }
+  .btn:hover > span, .btn.focus > span { filter: brightness(1.15); }
+  .btn:active > span { transform: translateY(4px); }
+  .btn:active { transform: scale(.96); }
+  .btn.sec { --face: var(--sec); --base: var(--secBase); color: var(--white); }
+  .btn.gold { --face: var(--yellow); --base: #9a8106; }
+  .btn.focus::after { content: ""; position: absolute; inset: -7px -7px -12px -7px; border: 4px solid #fff; border-radius: 24px; }
+
+  /* MENU */
+  #menu { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto;
+    column-gap: 3vmin; row-gap: 1.6vmin; align-content: center; max-width: 1200px; margin: 0 auto; padding-top: max(3vh, env(safe-area-inset-top)); }
+  #title { grid-column: 1 / -1; text-align: center; font-family: var(--title); font-size: min(7.2vw, 11vh); line-height: 1; margin: 0;
+    background: linear-gradient(180deg, #00ebff, #96ff46); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(4px 0 var(--ink)) drop-shadow(-4px 0 var(--ink)) drop-shadow(0 4px var(--ink)) drop-shadow(0 -4px var(--ink));
+    animation: breathe 1.4s ease-in-out infinite alternate; }
+  @keyframes breathe { to { transform: scale(1.03); } }
+  #subtitle { grid-column: 1 / -1; text-align: center; font-size: min(3vw, 4.6vh); font-weight: 500; margin: 0 0 1vh; }
+  #subtitle, .hint { text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink); }
+  .left { display: flex; flex-direction: column; align-items: center; gap: 2.2vh; min-width: 0; }
+  .ladderHead { font-family: var(--title); color: var(--muted); font-size: min(1.9vw, 3.2vh); letter-spacing: .25em; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4vw; width: 100%; }
+  .tile { position: relative; text-align: center; padding: 2.6vh 6px 1.8vh; border-radius: 14px; }
+  .tile .bar { position: absolute; top: -3px; left: 25%; right: 25%; height: 6px; border-radius: 3px; }
+  .tile canvas { width: min(6vw, 10vh); height: min(6vw, 10vh); }
+  .tile b { display: block; font-family: var(--title); font-size: min(1.5vw, 2.6vh); margin: 1.4vh 0 .8vh; }
+  .tile p { margin: 0 0 1.4vh; font-size: min(1.35vw, 2.4vh); }
+  .tile i { font-style: normal; font-family: var(--title); font-size: min(1.1vw, 2vh); color: var(--yellow); }
+  .actions { display: flex; gap: 2vw; align-items: center; width: 100%; justify-content: center; }
+  #playBtn { width: 52%; height: min(13vh, 8.5vw); font-size: min(4vw, 6.5vh); }
+  #skinsBtn { width: 25%; height: min(13vh, 8.5vw); font-size: min(1.8vw, 3vh); }
+  .board { display: flex; flex-direction: column; padding: 2.2vh 1.6vw; min-height: 0; }
+  .board h2 { margin: 0; display: flex; align-items: center; justify-content: center; gap: .8em; font-family: var(--title); color: var(--yellow); font-size: min(1.6vw, 2.8vh); }
+  .board .bestLine { text-align: center; font-size: min(1.8vw, 3vh); margin: 1.2vh 0; }
+  .board .bestLine b { color: var(--yellow); font-family: var(--title); font-size: .85em; }
+  .board hr { border: 0; border-top: 1px solid var(--panelLine); width: 100%; margin: 0 0 1vh; }
+  .board ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; }
+  .board li { display: flex; gap: .8em; padding: .55vh .6em; border-radius: 8px; font-size: min(1.5vw, 2.6vh); }
+  .board li:nth-child(odd) { background: rgba(255,255,255,.04); }
+  .board li .r { font-family: var(--title); font-size: .75em; width: 2.2em; align-self: center; }
+  .board li:nth-child(-n+3) .r, .board li:nth-child(-n+3) .s { color: var(--yellow); }
+  .board li .lv { flex: 1; color: var(--muted); }
+  .board li .s { font-family: var(--title); font-size: .8em; align-self: center; }
+  .board .empty { flex: 1; display: grid; place-items: center; color: var(--muted); font-size: min(1.6vw, 2.8vh); text-align: center; }
+  .board .foot { text-align: center; color: var(--muted); font-size: min(1.1vw, 2vh); margin-top: 1vh; }
+  .hint { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: min(1.7vw, 3vh); }
+  #muteMenu { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 62px; height: 56px; }
 
   /* HUD */
-  #hud { align-items: flex-start; justify-content: space-between; pointer-events: none; }
-  .hudPanel { display: flex; align-items: center; gap: clamp(10px, 2vw, 22px); padding: 8px 16px; pointer-events: none; }
-  .stat { text-align: center; }
-  .stat small { display: block; font-family: var(--title); font-size: 9px; color: var(--dim); margin-bottom: 4px; }
-  .stat b { font-family: var(--title); font-size: clamp(13px, 2vw, 18px); }
-  .stat.score b { font-size: clamp(16px, 2.8vw, 26px); color: var(--white); }
-  .lvBar { width: 64px; height: 6px; background: #ffffff18; border-radius: 3px; margin-top: 5px; overflow: hidden; }
-  .lvBar i { display: block; height: 100%; width: 0; background: var(--lime); }
-  .hudRight { display: flex; gap: 8px; align-items: center; pointer-events: auto; }
-  .timer { font-family: var(--title); font-size: 14px; padding: 12px 14px; }
-  .iconBtn { width: 52px; height: 52px; min-height: 52px; padding: 0; display: grid; place-items: center; font-size: 22px; }
+  #hud { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
+  .hudMain { display: flex; align-items: center; height: 62px; padding: 0 16px; gap: 16px; }
+  .hudMain .sep { width: 1px; align-self: stretch; margin: 12px 0; background: var(--panelLine); }
+  .lvChip { display: flex; flex-direction: column; gap: 6px; }
+  .lvChip .row { display: flex; align-items: center; gap: 6px; font-family: var(--title); font-size: 12px; }
+  .lvChip .track { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .lvChip .fill { height: 100%; width: 0; border-radius: 2px; }
+  #hudScore { font-family: var(--title); color: var(--yellow); font-size: 26px; min-width: 4.2em; text-align: center; }
+  .gems { display: flex; align-items: center; gap: 8px; font-family: var(--title); font-size: 16px; }
+  #hudTime { height: 62px; display: grid; place-items: center; padding: 0 16px; font-family: var(--title); color: var(--cyan); font-size: 16px; min-width: 104px; }
+  #hud .btn { height: 62px; }
+  #hudMute { width: 62px; } #hudMenu { font-size: 16px; padding: 0 2px; }
+  .flash { animation: flash .5s; } @keyframes flash { 30% { filter: brightness(1.8); transform: scale(1.06); } }
 
-  /* Banner, hint, toast */
-  #banner { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); font-family: var(--title);
-    font-size: clamp(22px, 5vw, 48px); color: var(--lime); text-shadow: 0 4px 0 #031012; pointer-events: none; opacity: 0;
-    transition: opacity .25s; text-align: center; white-space: nowrap; }
-  #banner small { display: block; font-size: .4em; color: var(--white); margin-top: 10px; }
-  #hint { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%);
-    font-size: clamp(14px, 2vw, 17px); color: var(--dim); background: #0009; padding: 8px 14px; border-radius: 10px;
-    pointer-events: none; white-space: nowrap; transition: opacity .4s; }
+  /* GAME OVER (centred on the arena by JS) */
+  #over { position: fixed; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .card { width: min(410px, 92%); padding: 22px 22px 26px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; pointer-events: auto; }
+  #overTitle { font-family: var(--title); font-size: 30px; margin: 0; background: linear-gradient(180deg, #ff9a3c, #ff5d6c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(3px 0 var(--ink)) drop-shadow(-3px 0 var(--ink)) drop-shadow(0 3px var(--ink)) drop-shadow(0 -3px var(--ink)); }
+  #overScore { font-family: var(--title); font-size: 46px; }
+  #overBest { font-family: var(--title); font-size: 12px; padding: 8px 18px; border-radius: 99px; background: var(--pink); }
+  #overBest.plain { background: none; color: var(--muted); font-family: var(--body); font-size: 16px; padding: 0; }
+  #overStats { font-size: 17px; display: flex; align-items: center; gap: 6px; }
+  #continueWrap { width: 88%; display: flex; flex-direction: column; gap: 10px; }
+  #continueBtn { height: 56px; font-size: 13px; width: 100%; }
+  .timerBar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .timerBar i { display: block; height: 100%; background: var(--yellow); width: 100%; }
+  .overBtns { display: flex; gap: 14px; margin-top: 6px; }
+  #againBtn { height: 62px; font-size: 16px; padding: 0 6px; }
+  #overMenuBtn { height: 62px; font-size: 16px; padding: 0 2px; }
+  #overHint { color: var(--muted); font-size: 16px; text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink); pointer-events: none; }
 
-  /* Game over */
-  .over { padding: 26px 30px; text-align: center; width: min(460px, 100%); }
-  .over h2 { font-family: var(--title); color: var(--red); font-size: clamp(20px, 4vw, 30px); margin: 0 0 18px; }
-  .over .big { font-family: var(--title); font-size: clamp(34px, 7vw, 54px); margin: 4px 0; }
-  .over .label { font-family: var(--title); font-size: 10px; color: var(--dim); }
-  .newBest { display: inline-block; font-family: var(--title); font-size: 12px; color: #04110f; background: var(--gold);
-    padding: 6px 10px; border-radius: 8px; margin: 8px 0; animation: pop .6s ease-in-out infinite alternate; }
-  @keyframes pop { to { transform: scale(1.08); } }
-  .row3 { display: flex; justify-content: center; gap: 22px; margin: 16px 0 22px; font-size: 15px; color: var(--dim); }
-  .row3 b { color: var(--white); font-family: var(--title); font-size: 13px; display: block; margin-top: 4px; }
-  .overBtns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .overBtns .btn { flex: 1 1 160px; }
-  #reviveBtn { width: 100%; margin-bottom: 12px; background: var(--cyan); color: #04110f; box-shadow: 0 6px 0 #1c9a92; }
+  /* SKINS */
+  #skins { display: grid; place-items: center; background: rgba(6,20,32,.45); }
+  .shop { width: min(880px, 100%); max-height: 100%; overflow: auto; padding: 22px 28px 26px; }
+  .shopHead { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .shopHead h2 { flex: 1; margin: 0; font-family: var(--title); color: var(--cyan); font-size: 26px; }
+  .shopHead .gems { color: var(--yellow); }
+  #skinsClose { width: 64px; height: 56px; font-size: 20px; }
+  .shop h3 { font-family: var(--title); color: var(--muted); font-size: 13px; margin: 16px 0 10px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+  .item { position: relative; background: rgba(255,255,255,.04); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; border: 2px solid transparent; }
+  .item:hover, .item.focus { border-color: rgba(255,255,255,.5); }
+  .item canvas { width: 100%; aspect-ratio: 120 / 84; border-radius: 8px; background: #08182a; }
+  .item .nm { font-size: 17px; }
+  .item .tag { font-family: var(--title); font-size: 11px; padding: 8px 4px; border-radius: 8px; width: 100%; text-align: center; color: var(--ink); background: var(--yellow); }
+  .item .tag.on { background: #0b2033; color: var(--green); }
+  .item .tag.own { background: var(--sec); color: var(--white); }
+  .item .feat { position: absolute; top: 4px; right: 4px; font-family: var(--title); font-size: 8px; background: var(--pink); color: #fff; padding: 4px 6px; border-radius: 6px; }
 
-  .menuMain { position: relative; }
-  #mute { position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; min-height: 44px; font-size: 18px; }
-  #rotate { position: fixed; inset: 0; background: var(--bg0); z-index: 50; display: none; flex-direction: column; align-items: center;
-    justify-content: center; gap: 16px; font-family: var(--title); font-size: 14px; text-align: center; padding: 24px; line-height: 1.6; }
+  #toast { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--panel);
+    border: 1px solid var(--panelLine); border-radius: 12px; padding: 10px 16px; font-size: 16px; display: flex; gap: 8px; align-items: center; opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+  #rotate { position: fixed; inset: 0; z-index: 50; display: none; background: #165f80; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; font-family: var(--title); font-size: 14px; text-align: center; line-height: 1.7; padding: 24px; }
 
-  @media (max-width: 760px), (max-height: 520px) {
-    .menuWrap { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .menuMain { padding: 12px; }
-    h1.logo { font-size: clamp(20px, 5vw, 34px); }
-    .sub { margin-bottom: 10px; }
-    .tiles { margin-top: 10px; gap: 6px; }
-    .tilesHead { margin-top: 10px; }
-    .tile { padding: 6px 4px; } .tile span { font-size: 12px; }
-    .board, .shop { padding: 10px; }
-    .board li { padding: 5px 8px; font-size: 14px; }
-    .over { padding: 16px 18px; }
-    .row3 { margin: 10px 0 14px; }
+  /* Phones (short landscape screens) */
+  @media (max-height: 500px) {
+    #menu { row-gap: 1vh; padding-top: max(1.5vh, env(safe-area-inset-top)); }
+    #muteMenu { width: 48px; height: 44px; }
+    .hudMain { height: 46px; gap: 10px; padding: 0 10px; }
+    .lvChip .row { font-size: 9px; } #hudScore { font-size: 17px; } .gems { font-size: 12px; }
+    #hudTime { height: 46px; font-size: 11px; min-width: 74px; padding: 0 8px; }
+    #hud .btn { height: 46px; } #hudMute { width: 48px; } #hudMenu { font-size: 11px; }
+    .card { padding: 12px 16px 16px; gap: 7px; }
+    #overTitle { font-size: 20px; } #overScore { font-size: 30px; } #overStats { font-size: 14px; }
+    #againBtn, #overMenuBtn { height: 48px; font-size: 12px; } #continueBtn { height: 44px; font-size: 10px; }
+    #overHint { display: none; }
+    .shop { padding: 12px 16px; } .shop h3 { margin: 8px 0 6px; } .items { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   }
-  @media (max-height: 520px) {
-    #hud { padding-top: max(6px, env(safe-area-inset-top)); }
-    .hudPanel { padding: 4px 12px; gap: 14px; border-radius: 12px; }
-    .stat small { font-size: 7px; margin-bottom: 2px; }
-    .stat b { font-size: 12px; } .stat.score b { font-size: 16px; }
-    .lvBar { width: 48px; margin-top: 3px; }
-    .timer { font-size: 11px; padding: 8px 10px; }
-    .iconBtn, .btn.small { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 10px; font-size: 11px; }
-  }
-  @media (max-width: 560px) and (orientation: portrait) {
-    .menuWrap { grid-template-columns: 1fr; }
-  }
-  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
-    #rotate.need { display: flex; }
-  }
+  @media (pointer: coarse) and (orientation: portrait) { #rotate { display: flex; } }
+  @media (prefers-reduced-motion: reduce) { #title { animation: none; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 
-<!-- MENU -->
 <div id="menu" class="layer">
-  <div class="menuWrap">
-    <div class="menuMain panel">
-      <button class="btn secondary iconBtn" id="mute" aria-label="Sound">♪</button>
-      <h1 class="logo">BLIP<br>PANIC</h1>
-      <p class="sub">Grab the gems. Dodge everything else.</p>
-      <button class="btn" id="playBtn" data-nav>PLAY</button>
-      <div class="tilesHead">SURVIVE TO LEVEL UP</div>
-      <div class="tiles">
-        <div class="tile"><canvas data-icon="bubble" width="10" height="10"></canvas><b>LV 1</b><span>Bubbles</span></div>
-        <div class="tile"><canvas data-icon="zoomer" width="10" height="10"></canvas><b>LV 3</b><span>Zoomers</span></div>
-        <div class="tile"><canvas data-icon="chaser" width="10" height="10"></canvas><b>LV 5</b><span>Chasers</span></div>
-      </div>
-    </div>
-    <div class="side">
-      <div class="board panel">
-        <h2>YOUR TOP 10</h2>
-        <ol id="boardList"></ol>
-        <div class="best" id="bestLine"></div>
-      </div>
-      <div class="shop panel">
-        <h2>SKINS <span class="gemCount" id="gemCount">0</span></h2>
-        <div class="skins" id="skins"></div>
-      </div>
+  <h1 id="title">BLIP PANIC!</h1>
+  <p id="subtitle">Dodge the bubbles &nbsp;•&nbsp; Grab the gems <canvas class="pix" data-icon="Star" style="height:1em"></canvas></p>
+  <div class="left">
+    <div class="ladderHead">SURVIVE TO LEVEL UP</div>
+    <div class="tiles" id="tiles"></div>
+    <div class="actions">
+      <button class="btn" id="playBtn" data-nav><span>PLAY!</span></button>
+      <button class="btn sec" id="skinsBtn" data-nav><span>SKINS</span></button>
     </div>
   </div>
+  <div class="board panel">
+    <h2><canvas class="pix" data-icon="Trophy" style="height:1.4em"></canvas>YOUR TOP 10</h2>
+    <div class="bestLine">YOUR BEST&nbsp; <b id="bestNum">0</b></div>
+    <hr>
+    <ol id="boardList"></ol>
+    <div class="foot">Saved on this device</div>
+  </div>
+  <div class="hint" id="menuHint">Steer with your mouse • grab 💎, dodge the rest</div>
+  <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
 </div>
 
-<!-- HUD -->
 <div id="hud" class="layer hidden">
-  <div class="hudPanel panel">
-    <div class="stat"><small>LEVEL</small><b id="hudLevel">1</b><div class="lvBar"><i id="hudLvBar"></i></div></div>
-    <div class="stat score"><small>SCORE</small><b id="hudScore">0</b></div>
-    <div class="stat"><small>GEMS</small><b id="hudGems" style="color:var(--cyan)">0</b></div>
+  <div class="hudMain panel" id="hudMain">
+    <div class="lvChip"><div class="row"><canvas class="pix" id="hudStage" style="height:18px"></canvas><span id="hudLevel">LV 1</span></div><div class="track"><div class="fill" id="hudFill"></div></div></div>
+    <div class="sep"></div>
+    <div id="hudScore">0</div>
+    <div class="sep"></div>
+    <div class="gems"><canvas class="pix" data-icon="Star" style="height:22px"></canvas><span id="hudGems">0</span></div>
   </div>
-  <div class="hudRight">
-    <div class="timer panel" id="hudTime">0.0</div>
-    <button class="btn secondary iconBtn" id="hudMute" aria-label="Sound">♪</button>
-    <button class="btn secondary small" id="hudMenu">MENU</button>
-  </div>
+  <div id="hudTime" class="panel">0.0s</div>
+  <button class="btn sec" id="hudMute" aria-label="Sound"><span><canvas class="pix" data-sound style="height:22px"></canvas></span></button>
+  <button class="btn sec" id="hudMenu"><span>MENU</span></button>
 </div>
 
-<!-- GAME OVER -->
-<div id="over" class="layer hidden">
-  <div class="over panel">
-    <h2>BLIPPED!</h2>
-    <div class="label">SCORE</div>
-    <div class="big" id="overScore">0</div>
+<div id="over" class="hidden">
+  <div class="card panel">
+    <h2 id="overTitle">SPLAT!</h2>
+    <div id="overScore">0</div>
     <div id="overBest"></div>
-    <div class="row3">
-      <div>Level<b id="overLevel">1</b></div>
-      <div>Time<b id="overTime">0s</b></div>
-      <div>Gems<b id="overGems" style="color:var(--cyan)">0</b></div>
+    <div id="overStats"></div>
+    <div id="continueWrap">
+      <button class="btn gold" id="continueBtn" data-nav><span>CONTINUE · <canvas class="pix" data-icon="Star" style="height:16px"></canvas> <b id="continueCost">15</b></span></button>
+      <div class="timerBar"><i id="continueBar"></i></div>
     </div>
-    <button class="btn" id="reviveBtn" data-nav>REVIVE · <span id="reviveCost">20</span> GEMS</button>
     <div class="overBtns">
-      <button class="btn" id="againBtn" data-nav>PLAY AGAIN</button>
-      <button class="btn secondary" id="overMenuBtn" data-nav>MENU</button>
+      <button class="btn" id="againBtn" data-nav><span>PLAY AGAIN</span></button>
+      <button class="btn sec" id="overMenuBtn" data-nav><span>MENU</span></button>
     </div>
+  </div>
+  <div id="overHint">Space = play again</div>
+</div>
+
+<div id="skins" class="layer hidden">
+  <div class="shop panel">
+    <div class="shopHead"><h2>SKINS</h2><div class="gems"><canvas class="pix" data-icon="Star" style="height:24px"></canvas><span id="shopGems">0</span></div>
+      <button class="btn sec" id="skinsClose" data-nav aria-label="Close"><span>✕</span></button></div>
+    <h3>BLIP</h3><div class="items" id="skinItems"></div>
+    <h3>ARENA</h3><div class="items" id="themeItems"></div>
   </div>
 </div>
 
-<div id="banner"></div>
-<div id="hint" class="hidden"></div>
-<div id="rotate"><div style="font-size:42px">⟳</div>Turn your phone sideways<br>to play</div>
+<div id="toast"></div>
+<div id="rotate"><div style="font-size:40px">⟳</div>Turn your phone sideways<br>to play</div>
 
 <script>
 "use strict";
-// ---------------------------------------------------------------- config
-const CFG = {
-  W: 1000, H: 625,                 // arena units
-  blipR: 12, blipSpeedFollow: 28,  // mouse follow sharpness
-  stickSpeed: 750, stickDeadzone: 0.12,
-  joyZone: 0.4, joyRadiusFrac: 0.14, joyMin: 48, joyMax: 90,
-  gemValue: 25, gemR: 13,
-  reviveCost: 20,
-  // per level: bubbles, bubble speed, zoomers, chasers
-  levels: [
-    null,
-    { dur: 5, bubbles: 6,  speed: 150, zoomers: 0, chasers: 0 },
-    { dur: 6, bubbles: 8,  speed: 165, zoomers: 0, chasers: 0 },
-    { dur: 8, bubbles: 9,  speed: 180, zoomers: 1, chasers: 0 },
-    { dur: 8, bubbles: 10, speed: 190, zoomers: 2, chasers: 0 },
-    { dur: 8, bubbles: 10, speed: 200, zoomers: 2, chasers: 1 },
-    { dur: 8, bubbles: 11, speed: 210, zoomers: 3, chasers: 1 },
-    { dur: 8, bubbles: 12, speed: 220, zoomers: 3, chasers: 2 },
-    { dur: 8, bubbles: 13, speed: 232, zoomers: 4, chasers: 2 },
-    { dur: 8, bubbles: 14, speed: 245, zoomers: 4, chasers: 3 },
-    { dur: 8, bubbles: 15, speed: 258, zoomers: 5, chasers: 3 },
+// =====================================================================
+// CONFIG (same numbers as the Roblox version's Config module)
+// =====================================================================
+const rgb = (r, g, b) => [r, g, b];
+const W = 1000, H = 625;
+const A = { BlipRadius: 11, HitForgiveness: 3, FollowSharpness: 30, TrailLength: 10, SmallScreenBlipScale: 1.4 };
+const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 750, SmallScreen: 500 };
+const LV = {
+  Every: 8, SpeedEase: 1.5, BannerTime: 1.4,
+  Levels: [
+    { Bubbles: 4, Speed: 190, Duration: 5 },
+    { Bubbles: 6, Speed: 210, Duration: 6 },
+    { Bubbles: 7, Speed: 225, ZoomerEvery: 5 },
+    { Bubbles: 8, Speed: 240, ZoomerEvery: 4.5 },
+    { Bubbles: 9, Speed: 255, ZoomerEvery: 4.5, Chasers: 1, ChaserEvery: 11 },
+    { Bubbles: 10, Speed: 270, ZoomerEvery: 4, Chasers: 1, ChaserEvery: 10 },
+    { Bubbles: 12, Speed: 285, ZoomerEvery: 3.5, Chasers: 2, ChaserEvery: 9 },
+    { Bubbles: 13, Speed: 300, ZoomerEvery: 3, Chasers: 2, ChaserEvery: 8 },
+    { Bubbles: 15, Speed: 320, ZoomerEvery: 2.8, Chasers: 3, ChaserEvery: 7.5 },
+    { Bubbles: 17, Speed: 340, ZoomerEvery: 2.5, Chasers: 3, ChaserEvery: 7 },
   ],
-  stages: { 1: ["WARM-UP", "#b6ff4a"], 3: ["ZOOMERS!", "#ff9f3a"], 5: ["CHASERS!", "#ff5fd2"] },
+  AfterLast: { Bubbles: 1, MaxBubbles: 26, Speed: 15, MaxSpeed: 480, ZoomerEvery: -0.15, MinZoomerEvery: 1.6, ChaserEvery: -0.5, MinChaserEvery: 5, MaxChasers: 4 },
+  Stages: [
+    { From: 1, Icon: "Chill", Title: "WARM-UP", Note: "Bubbles bounce around", Color: rgb(0, 205, 190) },
+    { From: 3, Icon: "Spicy", Title: "ZOOMERS", Note: "Fast ones zip across", Color: rgb(255, 128, 32) },
+    { From: 5, Icon: "Insane", Title: "CHASERS", Note: "They hunt you down", Color: rgb(240, 50, 120) },
+  ],
 };
+const durationOf = n => (LV.Levels[n - 1] && LV.Levels[n - 1].Duration) || LV.Every;
+const startOf = n => { let t = 0; for (let i = 1; i < n; i++) t += durationOf(i); return t; };
+const E = {
+  WarningTime: 0.75, BubbleCollisions: true,
+  CornerHeat: { Zone: 80, Glow: 2.0, Warn: 2.5, Red: 3.5, Strike: 4.0, AfterStrike: 2.0, DrainTime: 1.0 },
+  BumpCooldown: 0.12, SafeSpawnDistance: 220,
+  Bubble: { MinRadius: 16, MaxRadius: 34 },
+  Zoomer: { Radius: 13, SpeedMultiplier: 2.4, Aim: 0.85, AimSpread: 0.3 },
+  Chaser: { Radius: 21, SpeedMultiplier: 0.42, Turn: 2.2, Lifetime: 11 },
+  Colors: [rgb(0, 200, 255), rgb(255, 64, 112), rgb(255, 214, 10), rgb(160, 100, 255), rgb(90, 160, 255)],
+  ZoomerColor: rgb(255, 128, 32), ChaserColor: rgb(120, 245, 90),
+};
+const ST = { Every: 4, Lifetime: 6, Radius: 16, Points: 50, FirstAfter: 2 };
+const PointsPerSecond = 10;
+const REVIVE = { Cost: 15, Window: 5, ClearRadius: 140, PushRadius: 240, PushDistance: 80, ShieldTime: 2, RecoverTime: 5, StartSpeed: 0.75 };
+const THEME = { Ink: rgb(6, 20, 32), White: rgb(255, 255, 255), Yellow: rgb(255, 214, 10), Cyan: rgb(0, 229, 255), Muted: rgb(150, 196, 206) };
 const SKINS = [
-  { id: "classic", name: "Classic", price: 0,   fill: "#f2fffd", ring: "#3ff2e6" },
-  { id: "lime",    name: "Lime",    price: 30,  fill: "#b6ff4a", ring: "#2c7a12" },
-  { id: "sunset",  name: "Sunset",  price: 60,  fill: "#ff9f3a", ring: "#ff4f6d" },
-  { id: "grape",   name: "Grape",   price: 100, fill: "#b48cff", ring: "#5b2bd6" },
-  { id: "gold",    name: "Gold",    price: 200, fill: "#ffd84a", ring: "#b8860b" },
-  { id: "ghost",   name: "Ghost",   price: 350, fill: "#ffffff", ring: "#ffffff", ghost: true },
+  { Id: "Classic", Name: "Classic", Core: rgb(255, 255, 255), Glow: rgb(0, 229, 255), Trail: [rgb(120, 240, 255), rgb(0, 180, 255)], Burst: [rgb(120, 240, 255), rgb(255, 255, 255)] },
+  { Id: "Ice", Name: "Ice", Gems: 25, Core: rgb(240, 252, 255), Glow: rgb(150, 220, 255), Trail: [rgb(220, 248, 255), rgb(140, 200, 255)], Burst: [rgb(255, 255, 255), rgb(170, 230, 255), rgb(110, 180, 255)] },
+  { Id: "Fire", Name: "Fire", Gems: 50, Core: rgb(255, 245, 190), Glow: rgb(255, 120, 30), Trail: [rgb(255, 200, 60), rgb(255, 60, 30)], Burst: [rgb(255, 220, 80), rgb(255, 120, 30), rgb(230, 40, 30)] },
+  { Id: "Glitch", Name: "Glitch", Gems: 100, Core: rgb(255, 255, 255), Glow: rgb(255, 0, 200), Trail: [rgb(0, 255, 240), rgb(255, 0, 200)], Alternate: true, Burst: [rgb(0, 255, 240), rgb(255, 0, 200), rgb(160, 255, 60)] },
+  { Id: "Rainbow", Name: "Rainbow", Gems: 150, Featured: true, Core: rgb(255, 255, 255), Glow: rgb(255, 120, 200), Trail: [rgb(255, 80, 80), rgb(80, 160, 255)], Rainbow: true, Burst: [rgb(255, 80, 80), rgb(255, 200, 60), rgb(90, 230, 110), rgb(80, 160, 255), rgb(190, 110, 255)] },
 ];
-function levelDef(n) {
-  if (n < CFG.levels.length) return CFG.levels[n];
-  const last = CFG.levels[CFG.levels.length - 1], extra = n - (CFG.levels.length - 1);
-  return { dur: 8, bubbles: Math.min(22, last.bubbles + extra), speed: Math.min(380, last.speed + 12 * extra),
-           zoomers: Math.min(8, last.zoomers + Math.floor(extra / 2)), chasers: Math.min(5, last.chasers + Math.floor(extra / 3)) };
-}
-function levelStart(n) { let t = 0; for (let i = 1; i < n; i++) t += levelDef(i).dur; return t; }
+const THEMES = [
+  { Id: "Ocean", Name: "Ocean", Top: rgb(28, 120, 150), Bottom: rgb(16, 58, 96), Floor: rgb(8, 24, 42), Grid: rgb(0, 229, 255) },
+  { Id: "DeepSpace", Name: "Deep Space", Gems: 50, Top: rgb(34, 22, 78), Bottom: rgb(6, 6, 24), Floor: rgb(5, 5, 18), Grid: rgb(170, 150, 255) },
+  { Id: "NeonCity", Name: "Neon City", Gems: 150, Top: rgb(110, 20, 120), Bottom: rgb(18, 10, 50), Floor: rgb(14, 6, 30), Grid: rgb(255, 60, 200) },
+];
+const OUCH = ["POP!", "OUCH!", "BONK!", "SPLAT!", "WHOOPS!", "YIKES!"];
 
-// ---------------------------------------------------------------- save
-const SAVE_KEY = "blipPanic.v1";
-let save = { best: 0, top: [], gems: 0, owned: ["classic"], skin: "classic", muted: false };
+// pixel-art icons (Config.Icons)
+const monster = { Rows: [".D......D.", ".DD....DD.", "..DPPPPD..", ".DPPPPPPD.", "DPWWPPWWPD", "DPWKPPWKPD", "DPPPPPPPPD", "DPPKWWKPPD", ".DPPPPPPD.", "..DD..DD.."],
+  Palette: { D: rgb(150, 15, 60), P: rgb(255, 64, 112), W: rgb(255, 255, 255), K: rgb(6, 20, 32) } };
+const speakerBody = ["....W......", "...WW......", "WWWWW......", "WWWWW......", "WWWWW......", "WWWWW......", "...WW......", "....W......"];
+const speaker = (extra, pal) => ({ Rows: speakerBody.map((r, i) => r.slice(0, 5) + extra[i]), Palette: pal });
+const ICONS = {
+  Chill: { Rows: ["...XXXX...", ".XXCCCCXX.", ".XLLCCCCX.", "XLWLCCCCCX", "XLLCCCCCCX", "XCCCCCCCCX", "XCCCCCCCCX", ".XCCCCCCX.", ".XXCCCCXX.", "...XXXX..."],
+    Palette: { X: rgb(0, 110, 130), C: rgb(0, 205, 190), L: rgb(130, 245, 235), W: rgb(255, 255, 255) } },
+  Spicy: { Rows: [".......XXX..", "LLL...XLWOX.", ".....XLWOOOX", "LLLL.XOOOOOX", ".....XOOOOOX", "LLL...XOOOX.", ".......XXX.."],
+    Palette: { X: rgb(150, 60, 0), O: rgb(255, 128, 32), L: rgb(255, 200, 140), W: rgb(255, 255, 255) } },
+  Insane: monster, Chaser: monster,
+  Star: { Rows: ["..XXXXXXX..", ".XLLWCCCDX.", "XLLWCCCCDDX", "XDDDDDDDDDX", ".XCCCCCCDX.", "..XCCCCDX..", "...XCCDX...", "....XCX....", ".....X....."],
+    Palette: { X: rgb(0, 70, 120), C: rgb(0, 229, 255), L: rgb(170, 250, 255), W: rgb(255, 255, 255), D: rgb(0, 150, 210) } },
+  Trophy: { Rows: ["Y....Y....Y", "YY..YYY..YY", "YYY.YYY.YYY", "YYYYYYYYYYY", "YYPYYCYYPYY", "YYYYYYYYYYY", "DDDDDDDDDDD"],
+    Palette: { Y: rgb(255, 214, 10), D: rgb(200, 130, 0), P: rgb(255, 64, 112), C: rgb(0, 229, 255) } },
+  SoundOn: speaker(["......", "....C.", "..C..C", ".C.C.C", ".C.C.C", "..C..C", "....C.", "......"], { W: rgb(255, 255, 255), C: rgb(0, 229, 255) }),
+  SoundOff: speaker(["......", ".R...R", "..R.R.", "...R..", "..R.R.", ".R...R", "......", "......"], { W: rgb(255, 255, 255), R: rgb(255, 64, 112) }),
+};
+
+// =====================================================================
+// helpers
+// =====================================================================
+const $ = id => document.getElementById(id);
+const css = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const lerpC = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t].map(Math.round);
+const hsv = (h, s, v) => { const i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i % 6]; return [r * 255, g * 255, b * 255].map(Math.round); };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const len = (x, y) => Math.hypot(x, y);
+const iconCanvas = {};
+function iconSprite(key) {
+  if (iconCanvas[key]) return iconCanvas[key];
+  const art = ICONS[key], h = art.Rows.length, w = Math.max(...art.Rows.map(r => r.length));
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+  art.Rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = art.Palette[ch]; if (col) { g.fillStyle = css(col); g.fillRect(x, y, 1, 1); } }));
+  return (iconCanvas[key] = c);
+}
+function paintIcon(el, key) { const s = iconSprite(key); el.width = s.width; el.height = s.height; el.getContext("2d").drawImage(s, 0, 0); el.style.aspectRatio = s.width + "/" + s.height; }
+document.querySelectorAll("canvas[data-icon]").forEach(c => paintIcon(c, c.dataset.icon));
+const levelDef = n => {
+  const list = LV.Levels; if (n >= 1 && n <= list.length) return list[n - 1];
+  if (n < 1) return {};
+  const b = list[list.length - 1], k = n - list.length, a = LV.AfterLast;
+  return { Bubbles: Math.min(a.MaxBubbles, b.Bubbles + a.Bubbles * k), Speed: Math.min(a.MaxSpeed, b.Speed + a.Speed * k),
+    ZoomerEvery: Math.max(a.MinZoomerEvery, b.ZoomerEvery + a.ZoomerEvery * k), Chasers: Math.min(a.MaxChasers, b.Chasers + Math.floor(k / 2)),
+    ChaserEvery: Math.max(a.MinChaserEvery, b.ChaserEvery + a.ChaserEvery * k) };
+};
+const stageFor = n => { let s = LV.Stages[0]; for (const x of LV.Stages) if (n >= x.From) s = x; return s; };
+
+// =====================================================================
+// save (this device only)
+// =====================================================================
+const SAVE_KEY = "blipPanic.v2";
+let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false };
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+const skinDef = () => SKINS.find(s => s.Id === save.skin) || SKINS[0];
+const themeDef = () => THEMES.find(s => s.Id === save.theme) || THEMES[0];
 
-// ---------------------------------------------------------------- canvas
-const cv = document.getElementById("game"), ctx = cv.getContext("2d");
-let vw = 0, vh = 0, dpr = 1, scale = 1, ox = 0, oy = 0; // arena -> screen
-function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
-  vw = window.innerWidth; vh = window.innerHeight;
-  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
-  let hudSpace = 0;
-  if (state === "playing" || state === "over") {
-    for (const el of document.querySelectorAll(".hudPanel, .hudRight")) hudSpace = Math.max(hudSpace, el.getBoundingClientRect().bottom);
-    hudSpace = hudSpace || Math.min(78, vh * 0.14);
-  }
-  const pad = 10, availH = vh - hudSpace - pad * 2, availW = vw - pad * 2;
-  scale = Math.min(availW / CFG.W, availH / CFG.H);
-  ox = (vw - CFG.W * scale) / 2; oy = hudSpace + pad + (availH - CFG.H * scale) / 2;
-  joy.fit();
-  document.getElementById("rotate").classList.toggle("need", true);
-}
-const toArena = (x, y) => ({ x: (x - ox) / scale, y: (y - oy) / scale });
-
-// ---------------------------------------------------------------- audio (synth, no files)
+// =====================================================================
+// sounds (little synth versions of the Roblox sounds)
+// =====================================================================
 let actx = null;
-function beep(freq, dur, type = "square", vol = 0.06, slide = 0) {
+function tone(freq, dur, { type = "square", vol = 0.05, slide = 0, delay = 0 } = {}) {
   if (save.muted) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
-    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + delay;
     o.type = type; o.frequency.setValueAtTime(freq, t);
-    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.03);
   } catch (e) {}
 }
-const sfx = {
-  gem() { beep(880, 0.08); setTimeout(() => beep(1320, 0.1), 60); },
-  level() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.05), i * 80)); },
-  hit() { beep(220, 0.45, "sawtooth", 0.08, -180); },
-  click() { beep(600, 0.05, "square", 0.04); },
-  go() { beep(440, 0.1); setTimeout(() => beep(880, 0.18), 110); },
-};
-
-// ---------------------------------------------------------------- pixel icons
-const ICONS = {
-  bubble: { pal: { a: "#ff5a78", b: "#ffd0da", c: "#5a0f22" }, rows: [
-    "...aaaa...", "..aaaaaa..", ".aabbaaaa.", ".abbaaaaa.", ".aaaaaaaa.", ".aaaaaaaa.", ".aaaaaaaa.", "..aaaaaa..", "...aaaa...", ".........." ] },
-  zoomer: { pal: { a: "#ff9f3a", b: "#ffe2a8", c: "#ff4f6d" }, rows: [
-    "..........", "c...aaa...", ".c.aaaaa..", "cc.aabaaa.", "..caabbaaa", "cc.aabaaa.", ".c.aaaaa..", "c...aaa...", "..........", ".........." ] },
-  chaser: { pal: { a: "#ff5fd2", b: "#ffffff", c: "#2a0a24" }, rows: [
-    "..a....a..", "...a..a...", "..aaaaaa..", ".aabaabaa.", ".aacaacaa.", "aaaaaaaaaa", "a.aaaaaa.a", "a.a....a.a", "...aa.aa..", ".........." ] },
-  gem: { pal: { a: "#3ff2e6", b: "#e8fffd", c: "#18a59c" }, rows: [
-    "..........", "..aaaaaa..", ".abbaaaaa.", "abbaaaaaac", ".aaaaaaac.", "..aaaaac..", "...aaac...", "....ac....", "..........", ".........." ] },
-};
-function drawIcon(c, name) {
-  const ic = ICONS[name], g = c.getContext("2d");
-  g.clearRect(0, 0, c.width, c.height);
-  ic.rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ic.pal[ch]) { g.fillStyle = ic.pal[ch]; g.fillRect(x, y, 1, 1); } }));
+function noise(dur, vol = 0.12) {
+  if (save.muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const n = actx.sampleRate * dur, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.value = 1400; s.buffer = buf; g.gain.value = vol;
+    s.connect(f).connect(g).connect(actx.destination); s.start();
+  } catch (e) {}
 }
-document.querySelectorAll("canvas[data-icon]").forEach(c => drawIcon(c, c.dataset.icon));
-const iconSprites = {};
-for (const k in ICONS) { const c = document.createElement("canvas"); c.width = c.height = 10; drawIcon(c, k); iconSprites[k] = c; }
+const ping = (f, vol = .05) => { tone(f, 0.16, { type: "sine", vol: vol * 1.6 }); tone(f * 2, 0.08, { type: "triangle", vol: vol * .5 }); };
+const SFX = {
+  Click: () => tone(520, 0.04, { vol: 0.035 }),
+  Start: () => ping(560),
+  Star: () => { ping(1250, .06); tone(1870, .1, { type: "sine", vol: .05, delay: .06 }); },
+  Pop: () => { noise(0.28, 0.2); tone(300, 0.3, { type: "sawtooth", vol: 0.05, slide: -220 }); },
+  NewBest: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, { type: "square", vol: 0.04, delay: i * 0.09 })),
+  Warn: (p = 1) => tone(1400 * p, 0.035, { vol: 0.025 }),
+  LevelUp: () => { ping(800); tone(1200, .12, { type: "sine", vol: .05, delay: .08 }); },
+  Bump: p => tone(1500 * p, 0.025, { type: "triangle", vol: 0.03 }),
+  Revive: () => { ping(380, .07); tone(760, .25, { type: "sine", vol: .05, delay: .1 }); },
+};
 
-// ---------------------------------------------------------------- game state
+// =====================================================================
+// screen / layout
+// =====================================================================
+const cv = $("game"), ctx = cv.getContext("2d");
+let vw = 0, vh = 0, dpr = 1, ax = 0, ay = 0, as = 1; // arena -> screen: x*as + ax
+let small = false;
+function layout() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vw = window.innerWidth; vh = window.innerHeight; small = vh < IN.SmallScreen;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  let top = 12;
+  if (state !== "menu") { const r = $("hudMain").getBoundingClientRect(); if (r.height) top = r.bottom + (small ? 8 : 16); }
+  const pad = small ? 8 : 18, availW = vw - pad * 2, availH = vh - top - pad;
+  as = Math.min(availW / W, availH / H); ax = (vw - W * as) / 2; ay = top + (availH - H * as) / 2;
+  if (state === "menu") { as = Math.min(vw / W, vh / H) * 0.9; ax = (vw - W * as) / 2; ay = (vh - H * as) / 2; }
+  joy.fit();
+  const o = $("over").style; o.left = ax + "px"; o.top = ay + "px"; o.width = W * as + "px"; o.height = H * as + "px";
+}
+
+// background rings drifting up (behind everything)
+const rings = Array.from({ length: 10 }, (_, i) => ({ x: rnd(.02, .98), s: rnd(.02, .05), d: rnd(16, 32), off: rnd(0, 1), col: lerpC(E.Colors[i % 5], [255, 255, 255], .4), dx: rnd(-.05, .05) }));
+
+// =====================================================================
+// game state
+// =====================================================================
 let state = "menu"; // menu | playing | over
-let paused = false;
-let banked = 0, lastEntry = null, popups = [];
-let blip, bubbles, zoomers, chasers, gem, particles, t, score, gemsRun, level, revived, shake, inv, flash;
-let target = { x: CFG.W / 2, y: CFG.H / 2 };
-let inputMode = matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
-const rnd = (a, b) => a + Math.random() * (b - a);
+let paused = false, inputMode = matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
+const G = {}; // the run
+let effects = []; // bursts, float text
+let shakeT = -1, clock = 0;
+const SHAKE = [[12, -6], [-10, 8], [8, 6], [-6, -4], [3, 2], [0, 0]];
 
-function spawnEdge(r) { // somewhere away from the blip
-  for (let i = 0; i < 30; i++) {
-    const p = { x: rnd(r, CFG.W - r), y: rnd(r, CFG.H - r) };
-    if (Math.hypot(p.x - blip.x, p.y - blip.y) > 220) return p;
+function resetRun() {
+  Object.assign(G, { ents: [], star: null, time: 0, stars: 0, level: 0, def: levelDef(1), speed: levelDef(1).Speed, targetSpeed: levelDef(1).Speed,
+    revived: false, reviveAt: null, shieldUntil: null, calmUntil: null, heat: 0, heatCorner: null, dead: false, running: false,
+    blip: { x: W / 2, y: H / 2 }, hist: [], nextZoomer: Infinity, nextChaser: Infinity, nextStar: ST.FirstAfter, nextLevel: 0,
+    spawnQueue: [], lastBumpSound: -1, banner: null, entry: null });
+  G.hist = Array(A.TrailLength).fill(0).map(() => ({ x: W / 2, y: H / 2 }));
+  padTarget = { x: W / 2, y: H / 2 }; mouseTarget = null; effects = [];
+}
+function begin() { G.running = true; G.time = 0; G.level = 0; levelUp(); }
+function score() { return Math.floor(G.time * PointsPerSecond) + G.stars * ST.Points; }
+function levelUp() {
+  G.level++;
+  const def = levelDef(G.level); G.def = def; G.nextLevel = startOf(G.level + 1); G.targetSpeed = def.Speed;
+  const need = def.Bubbles - count("Bubble");
+  for (let i = 0; i < need; i++) G.spawnQueue.push(G.time + i * 0.15);
+  if (def.ZoomerEvery && G.nextZoomer === Infinity) G.nextZoomer = G.time + 1;
+  if ((def.Chasers || 0) > 0 && G.nextChaser === Infinity) G.nextChaser = G.time + 1.5;
+  onLevel(G.level, def);
+}
+const count = kind => G.ents.filter(e => e.kind === kind).length;
+function curSpeed() {
+  if (G.calmUntil && G.time < G.calmUntil) {
+    const t = G.time - G.reviveAt, ramp = clamp((t - REVIVE.ShieldTime) / Math.max(.01, REVIVE.RecoverTime - REVIVE.ShieldTime), 0, 1);
+    return G.speed * (REVIVE.StartSpeed + (1 - REVIVE.StartSpeed) * ramp);
   }
-  return { x: r, y: r };
+  return G.speed;
 }
-function addBubble(speed) {
-  const r = rnd(14, 30), p = spawnEdge(r), a = rnd(0, Math.PI * 2), f = rnd(0.8, 1.15), s = speed * f;
-  bubbles.push({ x: p.x, y: p.y, r, vx: Math.cos(a) * s, vy: Math.sin(a) * s, f, born: t });
+const shielded = () => G.shieldUntil != null && G.time < G.shieldUntil;
+function safePoint(r, minD) {
+  let best = null, bd = -1;
+  for (let i = 0; i < 12; i++) { const p = { x: rnd(r, W - r), y: rnd(r, H - r) }, d = len(p.x - G.blip.x, p.y - G.blip.y);
+    if (d >= minD) return p; if (d > bd) { best = p; bd = d; } }
+  return best;
 }
-function addZoomer() {
-  const fromLeft = Math.random() < 0.5, horiz = Math.random() < 0.6;
-  const z = { r: 15, warn: 0.9, born: t };
-  if (horiz) { z.y = rnd(40, CFG.H - 40); z.x = fromLeft ? -40 : CFG.W + 40; z.vx = (fromLeft ? 1 : -1) * rnd(520, 640); z.vy = 0; }
-  else { z.x = rnd(40, CFG.W - 40); z.y = fromLeft ? -40 : CFG.H + 40; z.vy = (fromLeft ? 1 : -1) * rnd(480, 600); z.vx = 0; }
-  zoomers.push(z);
+function addWarned(kind, pos, r, color, init) { const e = { kind, x: pos.x, y: pos.y, r, color, warn: E.WarningTime, born: G.time, init }; G.ents.push(e); return e; }
+function goLive(e) { e.warn = null; e.init(e); }
+function spawnBubble() {
+  const r = rnd(E.Bubble.MinRadius, E.Bubble.MaxRadius), p = safePoint(r, E.SafeSpawnDistance);
+  addWarned("Bubble", p, r, E.Colors[rndInt(0, 4)], e => { const a = rnd(0, Math.PI * 2); e.dx = Math.cos(a); e.dy = Math.sin(a); e.sf = rnd(0.8, 1.2); });
 }
-function addChaser() { const p = spawnEdge(16); chasers.push({ x: p.x, y: p.y, r: 16, vx: 0, vy: 0, born: t }); }
-function placeGem() {
-  for (let i = 0; i < 40; i++) {
-    const p = { x: rnd(60, CFG.W - 60), y: rnd(60, CFG.H - 60) };
-    if (Math.hypot(p.x - blip.x, p.y - blip.y) > 160) { gem = { x: p.x, y: p.y, born: t }; return; }
-  }
-  gem = { x: CFG.W / 2, y: CFG.H / 2, born: t };
+function spawnZoomer() {
+  const r = E.Zoomer.Radius, side = rndInt(1, 4); let p, d;
+  if (side === 1) { p = { x: r, y: rnd(r, H - r) }; d = { x: 1, y: rnd(-.3, .3) }; }
+  else if (side === 2) { p = { x: W - r, y: rnd(r, H - r) }; d = { x: -1, y: rnd(-.3, .3) }; }
+  else if (side === 3) { p = { x: rnd(r, W - r), y: r }; d = { x: rnd(-.3, .3), y: 1 }; }
+  else { p = { x: rnd(r, W - r), y: H - r }; d = { x: rnd(-.3, .3), y: -1 }; }
+  if (len(p.x - G.blip.x, p.y - G.blip.y) < E.SafeSpawnDistance * 0.6) return;
+  addWarned("Zoomer", p, r, E.ZoomerColor, e => {
+    const m = len(d.x, d.y); let dx = d.x / m, dy = d.y / m;
+    const tx = G.blip.x - e.x, ty = G.blip.y - e.y;
+    if (len(tx, ty) > 1 && Math.random() < E.Zoomer.Aim) { const a = Math.atan2(ty, tx) + rnd(-E.Zoomer.AimSpread, E.Zoomer.AimSpread); dx = Math.cos(a); dy = Math.sin(a); }
+    e.dx = dx; e.dy = dy;
+  });
+  SFX.Warn();
+}
+function spawnChaser() {
+  const r = E.Chaser.Radius;
+  const corners = [{ x: r, y: r }, { x: W - r, y: r }, { x: r, y: H - r }, { x: W - r, y: H - r }].sort((a, b) => len(b.x - G.blip.x, b.y - G.blip.y) - len(a.x - G.blip.x, a.y - G.blip.y));
+  addWarned("Chaser", corners[0], r, E.ChaserColor, e => { e.vx = 0; e.vy = 0; e.life = E.Chaser.Lifetime; });
+  SFX.Warn(0.8);
+}
+function spawnStar() {
+  const wallDist = p => Math.min(p.x, W - p.x, p.y, H - p.y);
+  let pos = safePoint(ST.Radius + 20, 150);
+  if (Math.random() > 0.25) for (let i = 0; i < 5; i++) { const q = safePoint(ST.Radius + 20, 150); if (wallDist(q) > wallDist(pos)) pos = q; }
+  G.star = { x: pos.x, y: pos.y, life: ST.Lifetime, born: G.time };
 }
 
-function startRun() {
-  blip = { x: CFG.W / 2, y: CFG.H / 2, trail: [] };
-  target = { x: blip.x, y: blip.y };
-  bubbles = []; zoomers = []; chasers = []; particles = []; popups = []; paused = false;
-  t = 0; score = 0; gemsRun = 0; banked = 0; lastEntry = null; level = 0; revived = false; shake = 0; inv = 1.2; flash = 0;
-  zoomTimer = 1.5;
-  placeGem();
-  setLevel(1);
-  setState("playing");
-  showBanner("GO!", "", 700);
-  sfx.go();
-  showHint();
+// ---- effects
+function burst(x, y, color, n, spread) {
+  for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), d = rnd(spread * .4, spread);
+    effects.push({ type: "dot", x, y, tx: x + Math.cos(a) * d, ty: y + Math.sin(a) * d, r: rnd(3, 7), color, t: 0, dur: rnd(.35, .6) }); }
 }
-let zoomTimer = 0;
-function setLevel(n) {
-  level = n;
-  const d = levelDef(n);
-  while (bubbles.length < d.bubbles) addBubble(d.speed);
-  while (chasers.length < d.chasers) addChaser();
-  if (n > 1) {
-    const st = CFG.stages[n];
-    showBanner("LEVEL " + n, st ? st[0] : "", 1300, st ? st[1] : null);
-    sfx.level();
-  }
-}
+const floatText = (x, y, text, color) => effects.push({ type: "text", x, y, text, color, t: 0, dur: 0.8 });
 
-// ---------------------------------------------------------------- update
-function update(dt) {
-  t += dt;
-  inv = Math.max(0, inv - dt); flash = Math.max(0, flash - dt * 3); shake = Math.max(0, shake - dt * 30);
-  // level ups
-  while (t >= levelStart(level + 1)) setLevel(level + 1);
-  const d = levelDef(level);
-  // move blip
-  if (inputMode === "mouse") {
-    const k = 1 - Math.exp(-CFG.blipSpeedFollow * dt);
-    blip.x += (target.x - blip.x) * k; blip.y += (target.y - blip.y) * k;
-  } else {
-    const v = inputMode === "touch" ? joy.vector() : padVector();
-    blip.x += v.x * CFG.stickSpeed * dt; blip.y += v.y * CFG.stickSpeed * dt;
-  }
-  blip.x = Math.max(CFG.blipR, Math.min(CFG.W - CFG.blipR, blip.x));
-  blip.y = Math.max(CFG.blipR, Math.min(CFG.H - CFG.blipR, blip.y));
-  blip.trail.push({ x: blip.x, y: blip.y }); if (blip.trail.length > 10) blip.trail.shift();
-
-  // bubbles: bounce, ease toward level speed
-  for (const b of bubbles) {
-    const sp = Math.hypot(b.vx, b.vy) || 1, ns = sp + (d.speed * b.f - sp) * Math.min(1, dt * 0.8);
-    b.vx *= ns / sp; b.vy *= ns / sp;
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); } if (b.x > CFG.W - b.r) { b.x = CFG.W - b.r; b.vx = -Math.abs(b.vx); }
-    if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy); } if (b.y > CFG.H - b.r) { b.y = CFG.H - b.r; b.vy = -Math.abs(b.vy); }
-  }
-  // zoomers
-  if (d.zoomers > 0) {
-    zoomTimer -= dt;
-    const live = zoomers.length;
-    if (zoomTimer <= 0 && live < d.zoomers) { addZoomer(); zoomTimer = rnd(0.8, 1.8); }
-  }
-  for (const z of zoomers) {
-    if (z.warn > 0) { z.warn -= dt; continue; }
-    z.x += z.vx * dt; z.y += z.vy * dt;
-    if (z.x < -80 || z.x > CFG.W + 80 || z.y < -80 || z.y > CFG.H + 80) z.dead = true;
-  }
-  zoomers = zoomers.filter(z => !z.dead);
-  // chasers: steer toward blip, capped speed
-  const cs = 120 + level * 9;
-  for (const c of chasers) {
-    const dx = blip.x - c.x, dy = blip.y - c.y, dist = Math.hypot(dx, dy) || 1;
-    c.vx += (dx / dist) * 420 * dt; c.vy += (dy / dist) * 420 * dt;
-    const s = Math.hypot(c.vx, c.vy); if (s > cs) { c.vx *= cs / s; c.vy *= cs / s; }
-    c.x += c.vx * dt; c.y += c.vy * dt;
-  }
-  // gem
-  if (gem && Math.hypot(gem.x - blip.x, gem.y - blip.y) < CFG.gemR + CFG.blipR + 4) {
-    gemsRun++; score += CFG.gemValue; sfx.gem(); burst(gem.x, gem.y, "#3ff2e6", 14); popup(gem.x, gem.y, "+" + CFG.gemValue, "#3ff2e6"); placeGem();
-  }
-  // score: 10 per second
-  score += dt * 10;
-  // collisions
-  if (inv <= 0) {
-    const r = CFG.blipR - 2; // a little forgiving
-    for (const b of bubbles) if (t - b.born > 0.6) { const d0 = Math.hypot(b.x - blip.x, b.y - blip.y); if (d0 < b.r + r) return die(); nearMiss(b, d0); }
-    for (const z of zoomers) if (z.warn <= 0) { const d0 = Math.hypot(z.x - blip.x, z.y - blip.y); if (d0 < z.r + r) return die(); nearMiss(z, d0); }
-    for (const c of chasers) if (t - c.born > 0.8 && Math.hypot(c.x - blip.x, c.y - blip.y) < c.r + r) return die();
-  }
-  updateParticles(dt);
-  updateHud();
-}
-function nearMiss(h, dist) {
-  if (dist < h.r + CFG.blipR + 16) h.close = true;
-  else if (h.close && dist > h.r + CFG.blipR + 34) { // it got really close and is now leaving
-    h.close = false;
-    if (t - (h.nm || -9) > 1.5) { h.nm = t; score += 5; popup(blip.x, blip.y - 22, "CLOSE! +5", "#ffd84a"); beep(1200, 0.05, "triangle", 0.04); }
-  }
-}
-function popup(x, y, text, color) { popups.push({ x, y, text, color, life: 0.9 }); }
-function burst(x, y, color, n) {
-  for (let i = 0; i < n; i++) { const a = rnd(0, 7), s = rnd(80, 320);
-    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.3, 0.7), max: 0.7, color }); }
-}
-function updateParticles(dt) {
-  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
-  particles = particles.filter(p => p.life > 0);
-  for (const p of popups) { p.y -= 50 * dt; p.life -= dt; }
-  popups = popups.filter(p => p.life > 0);
-}
-function die() {
-  sfx.hit(); shake = 14; flash = 1;
-  burst(blip.x, blip.y, "#ff4f6d", 30); burst(blip.x, blip.y, "#ffffff", 14);
-  if (navigator.vibrate && navigator.userActivation?.hasBeenActive) try { navigator.vibrate(120); } catch (e) {}
-  joy.finish();
-  setState("over");
-  const final = Math.floor(score);
-  save.gems += gemsRun - banked; banked = gemsRun;
-  const isBest = final > save.best;
-  if (isBest) save.best = final;
-  lastEntry = { s: final, lv: level, d: Date.now() };
-  save.top.push(lastEntry); save.top.sort((a, b) => b.s - a.s); save.top = save.top.slice(0, 10);
-  persist();
-  document.getElementById("overScore").textContent = final;
-  document.getElementById("overBest").innerHTML = isBest && final > 0 ? '<span class="newBest">NEW BEST!</span>' : '<div class="label" style="margin:8px 0">BEST ' + save.best + '</div>';
-  document.getElementById("overLevel").textContent = level;
-  document.getElementById("overTime").textContent = t.toFixed(1) + "s";
-  document.getElementById("overGems").textContent = gemsRun;
-  const rb = document.getElementById("reviveBtn");
-  rb.classList.toggle("hidden", revived || save.gems < CFG.reviveCost);
-  document.getElementById("reviveCost").textContent = CFG.reviveCost;
-  focusFirst();
-}
+// ---- revive
 function revive() {
-  if (revived || save.gems < CFG.reviveCost) return;
-  save.gems -= CFG.reviveCost; persist();
-  revived = true; inv = 2;
-  // clear hazards near the blip
-  bubbles = bubbles.filter(b => Math.hypot(b.x - blip.x, b.y - blip.y) > 200);
-  zoomers = []; chasers.forEach(c => { const p = spawnEdge(16); c.x = p.x; c.y = p.y; c.vx = c.vy = 0; c.born = t; });
-  const d = levelDef(level); while (bubbles.length < d.bubbles) addBubble(d.speed);
-  // remove the score already banked to the top list
-  save.top = save.top.filter(e => e !== lastEntry); persist();
-  target = { x: blip.x, y: blip.y };
-  setState("playing");
-  showBanner("REVIVED!", "", 900, "#3ff2e6"); sfx.go();
+  G.dead = false; G.running = true; G.revived = true; G.reviveAt = G.time;
+  G.shieldUntil = G.time + REVIVE.ShieldTime; G.calmUntil = G.time + REVIVE.RecoverTime;
+  G.ents = G.ents.filter(e => {
+    const ox = e.x - G.blip.x, oy = e.y - G.blip.y, d = len(ox, oy);
+    if (d < REVIVE.ClearRadius + e.r) { burst(e.x, e.y, e.color, 6, 60); return false; }
+    if (e.kind === "Bubble" && d < REVIVE.PushRadius && d > .01) { e.x = clamp(e.x + ox / d * REVIVE.PushDistance, e.r, W - e.r); e.y = clamp(e.y + oy / d * REVIVE.PushDistance, e.r, H - e.r); }
+    return true;
+  });
+  if (G.nextZoomer !== Infinity) G.nextZoomer = Math.max(G.nextZoomer, G.calmUntil);
+  if (G.nextChaser !== Infinity) G.nextChaser = Math.max(G.nextChaser, G.calmUntil);
+  G.hist = G.hist.map(() => ({ x: G.blip.x, y: G.blip.y }));
+  burst(G.blip.x, G.blip.y, skinDef().Glow, 14, 110);
+  SFX.Revive();
 }
 
-// ---------------------------------------------------------------- draw
-function draw() {
-  const w = cv.width, h = cv.height;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#0a2a2c"); g.addColorStop(1, "#04110f");
-  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // faint grid over the whole screen
-  ctx.strokeStyle = "rgba(63,242,230,0.05)"; ctx.lineWidth = 1;
-  for (let x = 0; x < vw; x += 40) { ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, vh); ctx.stroke(); }
-  for (let y = 0; y < vh; y += 40) { ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(vw, y + .5); ctx.stroke(); }
-  if (state === "menu") { drawMenuDemo(); return; }
+function die(killer) {
+  G.running = false; G.dead = true;
+  SFX.Pop();
+  const cols = skinDef().Burst; for (const c of cols) burst(G.blip.x, G.blip.y, c, Math.ceil(18 / cols.length), 120);
+  burst(G.blip.x, G.blip.y, killer.color, 10, 90);
+  shakeT = 0;
+  if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) try { navigator.vibrate(100); } catch (e) {}
+  onDeath();
+}
 
-  const sx = shake ? rnd(-shake, shake) : 0, sy = shake ? rnd(-shake, shake) : 0;
-  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (ox + sx), dpr * (oy + sy));
-  // arena
-  ctx.fillStyle = "rgba(4,17,15,0.55)"; roundRect(0, 0, CFG.W, CFG.H, 18); ctx.fill();
-  ctx.strokeStyle = "#1e5a60"; ctx.lineWidth = 4; roundRect(0, 0, CFG.W, CFG.H, 18); ctx.stroke();
-  ctx.save(); roundRect(0, 0, CFG.W, CFG.H, 18); ctx.clip();
-  // zoomer warnings
-  for (const z of zoomers) if (z.warn > 0) {
-    ctx.fillStyle = `rgba(255,79,109,${0.12 + 0.12 * Math.sin(t * 30)})`;
-    if (z.vy === 0) ctx.fillRect(0, z.y - z.r, CFG.W, z.r * 2); else ctx.fillRect(z.x - z.r, 0, z.r * 2, CFG.H);
+// ---- update
+function update(dt, target, instant) {
+  if (G.dead) return;
+  dt = Math.min(dt, 0.25);
+  if (target) {
+    const r = A.BlipRadius, tx = clamp(target.x, r, W - r), ty = clamp(target.y, r, H - r);
+    if (instant) { G.blip.x = tx; G.blip.y = ty; }
+    else { const a = 1 - Math.exp(-A.FollowSharpness * dt); G.blip.x += (tx - G.blip.x) * a; G.blip.y += (ty - G.blip.y) * a; }
   }
-  // gem
-  if (gem) { const bob = Math.sin((t - gem.born) * 5) * 4, s = CFG.gemR * 2.6;
-    ctx.globalAlpha = 0.25; ctx.fillStyle = "#3ff2e6"; circle(gem.x, gem.y + bob, CFG.gemR * 1.7); ctx.fill(); ctx.globalAlpha = 1;
-    sprite("gem", gem.x, gem.y + bob, s); }
-  // bubbles
-  for (const b of bubbles) {
-    const fade = Math.min(1, (t - b.born) / 0.6);
-    ctx.globalAlpha = fade * (t - b.born < 0.6 ? 0.5 : 1);
-    ctx.fillStyle = "#ff5a78"; circle(b.x, b.y, b.r); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.55)"; circle(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.28); ctx.fill();
-    ctx.strokeStyle = "#5a0f22"; ctx.lineWidth = 3; circle(b.x, b.y, b.r); ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  for (const z of zoomers) if (z.warn <= 0) {
-    const a = Math.atan2(z.vy, z.vx);
-    const tx = z.x - Math.cos(a) * 90, ty = z.y - Math.sin(a) * 90, tg = ctx.createLinearGradient(tx, ty, z.x, z.y);
-    tg.addColorStop(0, "rgba(255,159,58,0)"); tg.addColorStop(1, "rgba(255,200,90,0.75)");
-    ctx.strokeStyle = tg; ctx.lineWidth = z.r * 1.1; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(z.x, z.y); ctx.stroke();
-    ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(a); sprite("zoomer", 0, 0, z.r * 2.6); ctx.restore();
-  }
-  for (const c of chasers) {
-    ctx.globalAlpha = Math.min(1, (t - c.born) / 0.8);
-    ctx.fillStyle = "rgba(255,95,210,0.18)"; circle(c.x, c.y, c.r * 1.6); ctx.fill();
-    sprite("chaser", c.x, c.y + Math.sin(t * 8) * 1.5, c.r * 2.5);
-  }
-  ctx.globalAlpha = 1;
-  // blip
-  if (state === "playing" || flash > 0) drawBlip(blip.x, blip.y, inv > 0 && Math.floor(t * 12) % 2 === 0);
-  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); }
-  ctx.textAlign = "center"; ctx.font = "18px 'Press Start 2P', monospace";
-  for (const p of popups) { ctx.globalAlpha = Math.min(1, p.life * 2.5); ctx.fillStyle = "#031012"; ctx.fillText(p.text, p.x + 2, p.y + 2); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y); }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-  if (flash > 0) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = `rgba(255,79,109,${flash * 0.25})`; ctx.fillRect(0, 0, vw, vh); }
-  drawJoystick();
+  G.hist.unshift({ x: G.blip.x, y: G.blip.y }); G.hist.length = A.TrailLength;
+  if (!G.running) return;
+  const steps = Math.max(1, Math.ceil(dt / (1 / 60)));
+  for (let i = 0; i < steps; i++) if (step(dt / steps)) return;
 }
-function drawBlip(x, y, blink) {
-  const sk = SKINS.find(s => s.id === save.skin) || SKINS[0];
-  const r = CFG.blipR * (vh < 500 ? 1.35 : 1);
-  for (let i = 0; i < blip.trail.length; i++) { const p = blip.trail[i]; ctx.globalAlpha = (i / blip.trail.length) * 0.3;
-    ctx.fillStyle = sk.ring; circle(p.x, p.y, r * (i / blip.trail.length)); ctx.fill(); }
-  ctx.globalAlpha = blink ? 0.35 : (sk.ghost ? 0.7 : 1);
-  ctx.fillStyle = sk.ring; circle(x, y, r + 4); ctx.fill();
-  ctx.fillStyle = sk.fill; circle(x, y, r); ctx.fill();
-  ctx.fillStyle = "#04110f"; ctx.fillRect(x - r * 0.45, y - r * 0.3, r * 0.25, r * 0.4); ctx.fillRect(x + r * 0.2, y - r * 0.3, r * 0.25, r * 0.4);
-  ctx.globalAlpha = 1;
-}
-let demo = null;
-function drawMenuDemo() { // drifting bubbles behind the menu
-  if (!demo) demo = Array.from({ length: 14 }, () => ({ x: rnd(0, 1), y: rnd(0, 1), r: rnd(10, 30), vx: rnd(-0.03, 0.03), vy: rnd(-0.03, 0.03) }));
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  for (const b of demo) {
-    b.x = (b.x + b.vx / 60 + 1) % 1; b.y = (b.y + b.vy / 60 + 1) % 1;
-    ctx.globalAlpha = 0.14; ctx.fillStyle = "#ff5a78"; circle(b.x * vw, b.y * vh, b.r); ctx.fill();
+function step(dt) {
+  G.time += dt;
+  updateHeat(dt);
+  if (G.time >= G.nextLevel) levelUp();
+  while (G.spawnQueue.length && G.spawnQueue[0] <= G.time) { G.spawnQueue.shift(); spawnBubble(); }
+  const def = G.def;
+  G.speed += (G.targetSpeed - G.speed) * Math.min(1, dt * 3 / LV.SpeedEase);
+  if (G.time >= G.nextZoomer) { G.nextZoomer = def.ZoomerEvery ? G.time + def.ZoomerEvery : Infinity; spawnZoomer(); }
+  if (G.time >= G.nextChaser) { G.nextChaser = def.ChaserEvery ? G.time + def.ChaserEvery : Infinity; if (count("Chaser") < (def.Chasers || 0)) spawnChaser(); }
+  // gems
+  if (G.star) {
+    const s = G.star; s.life -= dt;
+    if (len(s.x - G.blip.x, s.y - G.blip.y) < ST.Radius + A.BlipRadius) {
+      G.stars++; SFX.Star(); burst(s.x, s.y, THEME.Cyan, 10, 70); floatText(s.x, s.y, "+" + ST.Points, THEME.Yellow); G.star = null; onStar();
+    } else if (s.life <= 0) G.star = null;
+  } else if (G.time >= G.nextStar) { G.nextStar = G.time + ST.Every; spawnStar(); }
+  // enemies
+  const speed = curSpeed(), hitR = A.BlipRadius - A.HitForgiveness;
+  for (let i = 0; i < G.ents.length; i++) {
+    const e = G.ents[i]; let remove = false;
+    if (e.warn != null) { e.warn -= dt; if (e.warn <= 0) goLive(e); continue; }
+    if (e.kind === "Bubble") {
+      let x = e.x + e.dx * speed * e.sf * dt, y = e.y + e.dy * speed * e.sf * dt;
+      if (x < e.r) { x = e.r; e.dx = Math.abs(e.dx); } else if (x > W - e.r) { x = W - e.r; e.dx = -Math.abs(e.dx); }
+      if (y < e.r) { y = e.r; e.dy = Math.abs(e.dy); } else if (y > H - e.r) { y = H - e.r; e.dy = -Math.abs(e.dy); }
+      e.x = x; e.y = y;
+    } else if (e.kind === "Zoomer") {
+      e.x += e.dx * speed * E.Zoomer.SpeedMultiplier * dt; e.y += e.dy * speed * E.Zoomer.SpeedMultiplier * dt;
+      if (e.x < -e.r || e.x > W + e.r || e.y < -e.r || e.y > H + e.r) remove = true;
+    } else if (e.kind === "Chaser") {
+      const tx = G.blip.x - e.x, ty = G.blip.y - e.y, m = len(tx, ty);
+      const dx = m > 1 ? tx / m * speed * E.Chaser.SpeedMultiplier : 0, dy = m > 1 ? ty / m * speed * E.Chaser.SpeedMultiplier : 0;
+      const k = Math.min(1, E.Chaser.Turn * dt); e.vx += (dx - e.vx) * k; e.vy += (dy - e.vy) * k;
+      e.x += e.vx * dt; e.y += e.vy * dt; e.life -= dt;
+      if (e.life <= 0) { burst(e.x, e.y, e.color, 8, 60); remove = true; }
+    }
+    if (!remove && !shielded() && len(e.x - G.blip.x, e.y - G.blip.y) < e.r + hitR) { die(e); return true; }
+    if (remove) { G.ents.splice(i, 1); i--; }
   }
-  ctx.globalAlpha = 1;
+  if (E.BubbleCollisions) collideBubbles();
+  return false;
 }
-function sprite(name, x, y, size) { ctx.imageSmoothingEnabled = false; ctx.drawImage(iconSprites[name], x - size / 2, y - size / 2, size, size); }
+
+// ---- corner heat (anti-camping)
+function cornerAt() {
+  const Z = E.CornerHeat.Zone, p = G.blip;
+  const cx = p.x < Z ? 0 : p.x > W - Z ? W : null, cy = p.y < Z ? 0 : p.y > H - Z ? H : null;
+  return cx != null && cy != null ? { x: cx, y: cy } : null;
+}
+function updateHeat(dt) {
+  const C = E.CornerHeat, c = cornerAt();
+  if (c) {
+    if (G.heatCorner && (G.heatCorner.x !== c.x || G.heatCorner.y !== c.y)) G.heat = Math.min(G.heat, C.Glow);
+    G.heatCorner = c; G.heat += dt;
+    if (G.heat >= C.Strike) { G.heat = C.AfterStrike; cornerStrike(c); }
+  } else G.heat = Math.max(0, G.heat - dt * C.Strike / C.DrainTime);
+}
+function cornerStrike(c) {
+  const r = E.Zoomer.Radius, p = { x: clamp(W - c.x, r, W - r), y: clamp(H - c.y, r, H - r) }, t = { x: clamp(c.x, 40, W - 40), y: clamp(c.y, 40, H - 40) };
+  addWarned("Zoomer", p, r, E.ZoomerColor, e => { const dx = t.x - e.x, dy = t.y - e.y, m = len(dx, dy); e.dx = dx / m; e.dy = dy / m; });
+  SFX.Warn(0.7);
+}
+
+// ---- bubble collisions (pool balls)
+function dirSpeed(vx, vy, fx, fy) { const m = len(vx, vy); if (m < 0.05) return [fx, fy, 0.8]; return [vx / m, vy / m, clamp(m, 0.7, 1.3)]; }
+function collideBubbles() {
+  const list = [], heavy = [];
+  for (const e of G.ents) if (e.warn == null) (e.kind === "Bubble" ? list : heavy).push(e);
+  const speed = Math.max(1, curSpeed());
+  for (const h of heavy) {
+    const hvx = h.kind === "Zoomer" ? h.dx * E.Zoomer.SpeedMultiplier : (h.vx || 0) / speed, hvy = h.kind === "Zoomer" ? h.dy * E.Zoomer.SpeedMultiplier : (h.vy || 0) / speed;
+    for (const b of list) {
+      const dx = b.x - h.x, dy = b.y - h.y, d = len(dx, dy), min = b.r + h.r;
+      if (d < min && d > .001) {
+        const nx = dx / d, ny = dy / d;
+        b.x = clamp(b.x + nx * (min - d), b.r, W - b.r); b.y = clamp(b.y + ny * (min - d), b.r, H - b.r);
+        let vx = b.dx * b.sf, vy = b.dy * b.sf; const ap = (vx - hvx) * nx + (vy - hvy) * ny;
+        if (ap < 0) { vx -= nx * 2 * ap; vy -= ny * 2 * ap; [b.dx, b.dy, b.sf] = dirSpeed(vx, vy, nx, ny); bump(b, h, h.x + nx * h.r, h.y + ny * h.r); }
+      }
+    }
+  }
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j], dx = b.x - a.x, dy = b.y - a.y, d = len(dx, dy), min = a.r + b.r;
+      if (d < min && d > .001) {
+        const nx = dx / d, ny = dy / d, push = (min - d) / 2;
+        a.x = clamp(a.x - nx * push, a.r, W - a.r); a.y = clamp(a.y - ny * push, a.r, H - a.r);
+        b.x = clamp(b.x + nx * push, b.r, W - b.r); b.y = clamp(b.y + ny * push, b.r, H - b.r);
+        let vax = a.dx * a.sf, vay = a.dy * a.sf, vbx = b.dx * b.sf, vby = b.dy * b.sf;
+        const ap = (vax - vbx) * nx + (vay - vby) * ny;
+        if (ap > 0) {
+          vax -= nx * ap; vay -= ny * ap; vbx += nx * ap; vby += ny * ap;
+          [a.dx, a.dy, a.sf] = dirSpeed(vax, vay, -nx, -ny); [b.dx, b.dy, b.sf] = dirSpeed(vbx, vby, nx, ny);
+          bump(a, b, a.x + nx * a.r, a.y + ny * a.r);
+        }
+      }
+    }
+  }
+}
+function bump(a, b, px, py) {
+  let fresh = false;
+  for (const e of [a, b]) if (G.time - (e.lastBump ?? -1) > E.BumpCooldown) { e.lastBump = G.time; e.squashT = 0; fresh = true; }
+  if (fresh) {
+    burst(px, py, lerpC(lerpC(a.color, b.color, .5), [255, 255, 255], .3), 5, 45);
+    if (G.time - G.lastBumpSound > 0.08) { G.lastBumpSound = G.time; SFX.Bump(0.9 + Math.random() * 0.3); }
+  }
+}
+
+// =====================================================================
+// drawing
+// =====================================================================
 function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0, r), 0, Math.PI * 2); }
-function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function drawBackground() {
+  const th = themeDef();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, vh); g.addColorStop(0, css(th.Top)); g.addColorStop(1, css(th.Bottom));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+  ctx.fillStyle = css(th.Grid, .06);
+  for (let i = 1; i < 24; i++) ctx.fillRect(Math.round(vw * i / 24), 0, 1, vh);
+  for (let i = 1; i < 14; i++) ctx.fillRect(0, Math.round(vh * i / 14), vw, 1);
+  ctx.lineWidth = 2;
+  for (const r of rings) {
+    const p = ((clock / r.d) + r.off) % 1, y = vh * (1.15 - 1.3 * p), x = vw * (r.x + r.dx * p), rad = vw * r.s / 2;
+    ctx.strokeStyle = css(r.col, .4); circle(x, y, rad); ctx.stroke();
+  }
+}
+function px(v) { return v / as; } // screen pixels -> arena units
+function drawBubble(x, y, r, color, squash) {
+  const s = squash ?? 1; r *= s;
+  const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  g.addColorStop(0, css(color)); g.addColorStop(1, css(color.map(c => c * 170 / 255)));
+  ctx.fillStyle = g; circle(x, y, r); ctx.fill();
+  ctx.strokeStyle = css(lerpC(color, [255, 255, 255], .4)); ctx.lineWidth = px(2); circle(x, y, r - px(1)); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.8)"; circle(x - .36 * r, y - .42 * r, .2 * r); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.55)"; circle(x - .04 * r, y - .56 * r, .08 * r); ctx.fill();
+}
+function drawIconAt(key, x, y, size, alpha = 1) {
+  const s = iconSprite(key), k = size / Math.max(s.width, s.height);
+  ctx.imageSmoothingEnabled = false; ctx.globalAlpha *= alpha;
+  ctx.drawImage(s, x - s.width * k / 2, y - s.height * k / 2, s.width * k, s.height * k);
+  ctx.globalAlpha /= alpha;
+}
+function strokeText(text, x, y, size, color, stroke = 3) {
+  ctx.font = `${size}px "Press Start 2P", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineJoin = "round"; ctx.lineWidth = px(stroke) * 2; ctx.strokeStyle = css(THEME.Ink); ctx.strokeText(text, x, y);
+  ctx.fillStyle = typeof color === "string" ? color : css(color); ctx.fillText(text, x, y);
+}
+function drawArena() {
+  const th = themeDef();
+  let sx = 0, sy = 0;
+  if (shakeT >= 0) { const i = Math.floor(shakeT / 0.035); if (i < SHAKE.length) [sx, sy] = SHAKE[i]; else shakeT = -1; }
+  ctx.setTransform(dpr * as, 0, 0, dpr * as, dpr * (ax + sx), dpr * (ay + sy));
+  const stage = stageFor(Math.max(1, G.level || 1)), radius = px(16);
+  ctx.fillStyle = css(th.Floor); rr(0, 0, W, H, radius); ctx.fill();
+  ctx.save(); rr(0, 0, W, H, radius); ctx.clip();
+  ctx.fillStyle = css(th.Grid, .05);
+  for (let i = 1; i < 10; i++) ctx.fillRect(W * i / 10, 0, px(1), H);
+  for (let i = 1; i < 6; i++) ctx.fillRect(0, H * i / 6, W, px(1));
 
-// ---------------------------------------------------------------- touch joystick
-const joy = {
-  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
-  fit() { this.r = Math.max(CFG.joyMin, Math.min(CFG.joyMax, Math.floor(vh * CFG.joyRadiusFrac))); },
-  inZone(x) { return x <= vw * CFG.joyZone; },
-  begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = Math.min(Math.max(y, this.r + 4), vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
-  move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = Math.hypot(dx, dy);
-    if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
-  finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
-  active() { return this.id !== null; },
-  vector() { const m = Math.hypot(this.dx, this.dy) / this.r; if (m < CFG.stickDeadzone) return { x: 0, y: 0 };
-    const k = (m - CFG.stickDeadzone) / (1 - CFG.stickDeadzone) / m; return { x: this.dx / this.r * k, y: this.dy / this.r * k }; },
-};
+  // corner heat glow (under everything)
+  const C = E.CornerHeat;
+  if (G.running && G.heatCorner && G.heat >= C.Glow) {
+    const red = G.heat >= C.Red; ctx.fillStyle = red ? "rgba(255,60,70,.45)" : "rgba(255,180,40,.25)";
+    circle(G.heatCorner.x, G.heatCorner.y, C.Zone * 2.2); ctx.fill();
+  }
+  // banner (under the play layer: never hides danger)
+  if (G.banner) {
+    const b = G.banner, t = clock - b.at;
+    if (t > b.dur) G.banner = null;
+    else {
+      const k = t < .3 ? backOut(t / .3) * .6 + .4 : 1;
+      ctx.save(); ctx.translate(W / 2, H / 2 - 30); ctx.scale(k, k);
+      strokeText(b.title, 0, 0, b.size, b.color, 5);
+      if (b.note) { ctx.font = `500 30px Ubuntu, sans-serif`; ctx.lineWidth = px(3) * 2; ctx.strokeStyle = css(THEME.Ink);
+        const w = ctx.measureText(b.note).width, iw = b.icon ? 40 : 0, x0 = -(w + iw) / 2;
+        if (b.icon) drawIconAt(b.icon, x0 + 16, 70, 32);
+        ctx.textAlign = "left"; ctx.strokeText(b.note, x0 + iw, 72); ctx.fillStyle = "#fff"; ctx.fillText(b.note, x0 + iw, 72); }
+      ctx.restore();
+    }
+  }
+  // gem (under the bubbles)
+  if (G.star) {
+    const s = G.star, pulse = 0.975 + 0.125 * Math.sin((G.time - s.born) * Math.PI * 2);
+    const alpha = s.life < 1.5 && Math.floor(s.life * 8) % 2 === 0 ? 0.4 : 1;
+    drawIconAt("Star", s.x, s.y, ST.Radius * 2.8 * pulse, alpha);
+  }
+  // enemies
+  for (const e of G.ents) {
+    if (e.warn != null) {
+      const p = 1 - e.warn / E.WarningTime, r = e.r * (1.6 - .6 * p * p);
+      ctx.strokeStyle = css(e.color, Math.sin(clock * Math.PI / .18) > 0 ? 1 : .2); ctx.lineWidth = px(3); circle(e.x, e.y, r - px(1.5)); ctx.stroke();
+      continue;
+    }
+    let sq = 1; if (e.squashT != null) { e.squashT += lastDt; sq = e.squashT >= .22 ? 1 : .82 + .18 * backOut(e.squashT / .22); if (e.squashT >= .22) e.squashT = null; }
+    drawBubble(e.x, e.y, e.r, e.color, sq);
+    if (e.kind === "Chaser") drawIconAt("Chaser", e.x, e.y + e.r * .04, e.r * 2 * .68);
+  }
+  // blip
+  if (!G.dead || state === "menu") drawBlip();
+  // effects
+  for (const f of effects) {
+    const k = Math.min(1, f.t / f.dur), q = 1 - (1 - k) * (1 - k);
+    if (f.type === "dot") { ctx.fillStyle = css(f.color, 1 - k); circle(f.x + (f.tx - f.x) * q, f.y + (f.ty - f.y) * q, f.r * (1 - k)); ctx.fill(); }
+    else { ctx.globalAlpha = 1 - k; strokeText(f.text, f.x, f.y - 60 * q, 34, f.color, 2); ctx.globalAlpha = 1; }
+  }
+  // MOVE! + heat bars
+  if (G.running && G.heatCorner && G.heat >= C.Warn) {
+    const red = G.heat >= C.Red, col = red ? [255, 60, 70] : [255, 180, 40], c = G.heatCorner;
+    const ix = c.x === 0 ? 1 : -1, iy = c.y === 0 ? 1 : -1, x = c.x + ix * (C.Zone + 90), y = c.y + iy * (C.Zone + 40);
+    strokeText("MOVE!", x, y, 34, col, 3);
+    const fill = (G.heat - C.Warn) / (C.Strike - C.Warn) * 3;
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = fill >= i + .01 ? css(col) : "rgb(60,60,80)"; rr(x - 56 + i * 39, y + 26, 34, 12, 4); ctx.fill(); }
+  }
+  ctx.restore();
+  // border in the stage colour
+  ctx.strokeStyle = css(stage.Color); ctx.lineWidth = px(3); rr(px(1.5), px(1.5), W - px(3), H - px(3), radius); ctx.stroke();
+}
+const backOut = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+function drawBlip() {
+  const sk = skinDef(), s = small ? A.SmallScreenBlipScale : 1, r = A.BlipRadius * s;
+  const hue0 = sk.Rainbow ? (clock * 0.6) % 1 : 0;
+  for (let i = A.TrailLength - 1; i >= 0; i--) {
+    const p = G.hist[i]; if (!p) continue; const n = i + 1;
+    let col = sk.Alternate ? (n % 2 === 0 ? sk.Trail[1] : sk.Trail[0]) : lerpC(sk.Trail[0], sk.Trail[1], i / (A.TrailLength - 1));
+    if (sk.Rainbow) col = hsv((hue0 + n * 0.08) % 1, .75, 1);
+    ctx.fillStyle = css(col, Math.max(0, 0.6 - n * 0.055)); circle(p.x, p.y, r * (1 - n * 0.07)); ctx.fill();
+  }
+  const glowCol = sk.Rainbow ? hsv(hue0, .6, 1) : sk.Glow, ga = 0.3 + 0.1 * Math.cos(clock * Math.PI * 2);
+  ctx.fillStyle = css(glowCol, ga); circle(G.blip.x, G.blip.y, r * 2.1); ctx.fill();
+  ctx.fillStyle = css(sk.Core); circle(G.blip.x, G.blip.y, r); ctx.fill();
+  ctx.strokeStyle = css(sk.Glow); ctx.lineWidth = px(3); circle(G.blip.x, G.blip.y, r + px(1.5)); ctx.stroke();
+  if (shielded()) {
+    const left = G.shieldUntil - G.time, a = left < .6 && Math.floor(left * 10) % 2 === 0 ? .2 : 1;
+    ctx.fillStyle = "rgba(255,255,255,.15)"; circle(G.blip.x, G.blip.y, r * 2.8); ctx.fill();
+    ctx.strokeStyle = css(sk.Glow, a); ctx.lineWidth = px(3); circle(G.blip.x, G.blip.y, r * 2.8); ctx.stroke();
+  }
+}
 function drawJoystick() {
   joy.alpha += ((joy.active() ? 1 : 0) - joy.alpha) * 0.35;
-  if (joy.alpha < 0.02 || inputMode !== "touch") return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.globalAlpha = joy.alpha;
-  ctx.fillStyle = "rgba(15,50,54,0.45)"; circle(joy.ox, joy.oy, joy.r); ctx.fill();
-  ctx.strokeStyle = "#3ff2e6"; ctx.lineWidth = 3; circle(joy.ox, joy.oy, joy.r); ctx.stroke();
-  ctx.fillStyle = "rgba(63,242,230,0.65)"; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * 0.46); ctx.fill();
-  ctx.strokeStyle = "#f2fffd"; ctx.lineWidth = 2; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * 0.46); ctx.stroke();
+  if (joy.alpha < 0.02) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = joy.alpha;
+  ctx.fillStyle = "rgba(8,26,44,.3)"; circle(joy.ox, joy.oy, joy.r); ctx.fill();
+  ctx.strokeStyle = css(THEME.Cyan); ctx.lineWidth = 3; circle(joy.ox, joy.oy, joy.r); ctx.stroke();
+  ctx.fillStyle = "rgba(0,229,255,.65)"; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * .46); ctx.fill();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * .46); ctx.stroke();
   ctx.globalAlpha = 1;
 }
+function drawPause() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "rgba(6,20,32,.6)"; ctx.fillRect(0, 0, vw, vh);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#fff"; ctx.font = '26px "Press Start 2P", monospace'; ctx.fillText("PAUSED", vw / 2, vh / 2 - 16);
+  ctx.fillStyle = css(THEME.Muted); ctx.font = "500 18px Ubuntu, sans-serif";
+  ctx.fillText(inputMode === "touch" ? "Tap to keep going" : inputMode === "gamepad" ? "Press A to keep going" : "Click or press any key to keep going", vw / 2, vh / 2 + 24);
+}
 
-// ---------------------------------------------------------------- input
-function setInput(m) { if (inputMode !== m) { inputMode = m; showHint(); } }
-cv.addEventListener("pointerdown", e => {
-  if (e.pointerType === "touch") return; // handled by touch events
-  setInput("mouse"); const a = toArena(e.clientX, e.clientY); target = a;
-});
+// =====================================================================
+// touch joystick (same as the Roblox TouchJoystick module)
+// =====================================================================
+const joy = {
+  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
+  fit() { this.r = clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
+  inZone(x) { return x <= vw * IN.JoyZone; },
+  begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = clamp(y, this.r + 4, vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
+  move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = len(dx, dy); if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
+  finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
+  active() { return this.id !== null; },
+  vector() { const m = len(this.dx, this.dy) / this.r; if (m < IN.JoyDeadzone) return { x: 0, y: 0 };
+    const k = (m - IN.JoyDeadzone) / (1 - IN.JoyDeadzone) / m; return { x: this.dx / this.r * k, y: this.dy / this.r * k }; },
+};
+
+// =====================================================================
+// input
+// =====================================================================
+let mouseTarget = null, padTarget = { x: W / 2, y: H / 2 };
+const keys = new Set();
+function setInputMode(m) {
+  if (inputMode === m) return; inputMode = m;
+  document.body.classList.toggle("mouse", m === "mouse");
+  paintHints(); paintFocus();
+}
+const toArena = (x, y) => ({ x: (x - ax) / as, y: (y - ay) / as });
 window.addEventListener("pointermove", e => {
   if (e.pointerType === "touch") return;
-  if (inputMode !== "mouse" && (Math.abs(e.movementX) + Math.abs(e.movementY) < 3)) return;
-  setInput("mouse"); target = toArena(e.clientX, e.clientY);
+  if (inputMode !== "mouse" && Math.abs(e.movementX) + Math.abs(e.movementY) < 4) return;
+  setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
+});
+cv.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") return;
+  setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
+  if (paused) paused = false;
 });
 cv.addEventListener("touchstart", e => {
-  e.preventDefault();
-  setInput("touch");
+  e.preventDefault(); setInputMode("touch");
   if (state !== "playing") return;
   if (paused) { paused = false; return; }
-  for (const tch of e.changedTouches) if (!joy.active() && joy.inZone(tch.clientX)) joy.begin(tch.identifier, tch.clientX, tch.clientY);
+  for (const t of e.changedTouches) if (!joy.active() && joy.inZone(t.clientX)) joy.begin(t.identifier, t.clientX, t.clientY);
 }, { passive: false });
-cv.addEventListener("touchmove", e => { e.preventDefault(); for (const tch of e.changedTouches) joy.move(tch.identifier, tch.clientX, tch.clientY); }, { passive: false });
-const endTouch = e => { for (const tch of e.changedTouches) joy.finish(tch.identifier); };
+cv.addEventListener("touchmove", e => { e.preventDefault(); for (const t of e.changedTouches) joy.move(t.identifier, t.clientX, t.clientY); }, { passive: false });
+const endTouch = e => { for (const t of e.changedTouches) joy.finish(t.identifier); };
 cv.addEventListener("touchend", endTouch); cv.addEventListener("touchcancel", endTouch);
-document.addEventListener("touchstart", () => setInput("touch"), { passive: true });
+document.addEventListener("touchstart", () => setInputMode("touch"), { passive: true, capture: true });
 
-const keys = new Set();
+const MOVE_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"];
 window.addEventListener("keydown", e => {
-  keys.add(e.code); if (paused && e.code !== "Escape" && e.code !== "KeyP") { paused = false; return; }
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
-    if (state === "playing") { setInput("keys"); e.preventDefault(); } else { navMenu(e.code); e.preventDefault(); }
+  keys.add(e.code);
+  if (paused && e.code !== "Escape" && e.code !== "KeyP") { paused = false; return; }
+  if (e.code === "KeyM") { toggleMute(); return; }
+  if (state === "playing") {
+    if (MOVE_KEYS.includes(e.code)) { setInputMode("keys"); e.preventDefault(); }
+    if (e.code === "Escape" || e.code === "KeyP") { paused = !paused; joy.finish(); }
+    return;
   }
-  if ((e.code === "Enter" || e.code === "Space") && state !== "playing") { e.preventDefault(); pressFocused(); }
-  if (e.code === "KeyM") toggleMute();
-  if ((e.code === "Escape" || e.code === "KeyP") && state === "playing") { paused = !paused; joy.finish(); return; }
+  if (!$("skins").classList.contains("hidden") && e.code === "Escape") { closeSkins(); return; }
+  if (state === "over" && e.code === "Space") { e.preventDefault(); act("again"); return; }
+  if (state === "over" && e.code === "Escape") { act("menu"); return; }
+  if (MOVE_KEYS.includes(e.code)) { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") setInputMode("keys"); else nav(e.code); return; }
+  if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") { setInputMode("keys"); } pressFocused(); }
 });
 window.addEventListener("keyup", e => keys.delete(e.code));
-window.addEventListener("blur", () => { keys.clear(); joy.finish(); });
+window.addEventListener("blur", () => { keys.clear(); joy.finish(); if (state === "playing") paused = true; });
+document.addEventListener("visibilitychange", () => { if (document.hidden && state === "playing") paused = true; });
 
-function padVector() {
+function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
+function stickVector() {
   if (inputMode === "keys") {
     let x = 0, y = 0;
-    if (keys.has("ArrowLeft") || keys.has("KeyA")) x -= 1; if (keys.has("ArrowRight") || keys.has("KeyD")) x += 1;
-    if (keys.has("ArrowUp") || keys.has("KeyW")) y -= 1; if (keys.has("ArrowDown") || keys.has("KeyS")) y += 1;
-    const m = Math.hypot(x, y) || 1; return { x: x / m, y: y / m };
+    if (keys.has("ArrowLeft") || keys.has("KeyA")) x--; if (keys.has("ArrowRight") || keys.has("KeyD")) x++;
+    if (keys.has("ArrowUp") || keys.has("KeyW")) y--; if (keys.has("ArrowDown") || keys.has("KeyS")) y++;
+    const m = len(x, y) || 1; return { x: x / m, y: y / m };
   }
   const gp = getPad(); if (!gp) return { x: 0, y: 0 };
   let x = gp.axes[0] || 0, y = gp.axes[1] || 0;
   if (gp.buttons[14]?.pressed) x = -1; if (gp.buttons[15]?.pressed) x = 1; if (gp.buttons[12]?.pressed) y = -1; if (gp.buttons[13]?.pressed) y = 1;
-  const m = Math.hypot(x, y); if (m < 0.2) return { x: 0, y: 0 };
-  const c = Math.min(1, Math.pow((m - 0.2) / 0.8, 1.5)); return { x: x / m * c, y: y / m * c };
+  const m = len(x, y); if (m < IN.PadDeadzone) return { x: 0, y: 0 };
+  const c = Math.pow(Math.min(1, (m - IN.PadDeadzone) / (1 - IN.PadDeadzone)), IN.PadCurve); return { x: x / m * c, y: y / m * c };
 }
-function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
-let padPrev = {};
+const padPrev = {};
 function pollPad() {
   const gp = getPad(); if (!gp) return;
-  const pressed = i => gp.buttons[i]?.pressed, edge = i => pressed(i) && !padPrev[i];
-  const moved = Math.hypot(gp.axes[0] || 0, gp.axes[1] || 0) > 0.4 || [0, 1, 9, 12, 13, 14, 15].some(pressed);
-  if (moved && inputMode !== "pad") setInput("pad");
-  if (state !== "playing") {
+  const pr = i => !!gp.buttons[i]?.pressed, edge = i => pr(i) && !padPrev[i];
+  const ay2 = gp.axes[1] || 0, ax2 = gp.axes[0] || 0;
+  if ((len(ax2, ay2) > 0.4 || [0, 1, 9, 12, 13, 14, 15].some(pr)) && inputMode !== "gamepad") setInputMode("gamepad");
+  if (state === "playing") {
+    if (edge(9)) paused = !paused; else if (paused && edge(0)) paused = false;
+  } else {
     if (edge(0)) pressFocused();
-    if (edge(12) || edge(14)) navMenu("ArrowUp"); if (edge(13) || edge(15)) navMenu("ArrowDown");
-    const ay = gp.axes[1] || 0; if (ay < -0.6 && !padPrev.up) navMenu("ArrowUp"); if (ay > 0.6 && !padPrev.down) navMenu("ArrowDown");
-    padPrev.up = ay < -0.6; padPrev.down = ay > 0.6;
-  } else if (edge(9)) { paused = !paused; } else if (paused && edge(0)) { paused = false; }
-  for (let i = 0; i < gp.buttons.length; i++) padPrev[i] = pressed(i);
+    if (edge(1)) { if (!$("skins").classList.contains("hidden")) closeSkins(); else if (state === "over") act("menu"); }
+    if (edge(12) || (ay2 < -.6 && !padPrev.up)) nav("ArrowUp"); if (edge(13) || (ay2 > .6 && !padPrev.down)) nav("ArrowDown");
+    if (edge(14) || (ax2 < -.6 && !padPrev.left)) nav("ArrowLeft"); if (edge(15) || (ax2 > .6 && !padPrev.right)) nav("ArrowRight");
+  }
+  padPrev.up = ay2 < -.6; padPrev.down = ay2 > .6; padPrev.left = ax2 < -.6; padPrev.right = ax2 > .6;
+  for (let i = 0; i < gp.buttons.length; i++) padPrev[i] = pr(i);
 }
 
-// keyboard / controller focus for menus
-function navList() { return [...document.querySelectorAll(state === "menu" ? "#menu [data-nav], #menu .skin" : "#over [data-nav]")].filter(b => b.offsetParent !== null); }
+// focus for keyboard / controller
 let focusIdx = 0;
-function focusFirst() { focusIdx = 0; paintFocus(); }
-function paintFocus() { document.querySelectorAll(".focus").forEach(b => b.classList.remove("focus")); if (inputMode === "mouse" || inputMode === "touch") return; const l = navList(); if (l[focusIdx]) l[focusIdx].classList.add("focus"); }
-function navMenu(code) { const l = navList(); if (!l.length) return; if (inputMode === "mouse" || inputMode === "touch") inputMode = "keys";
-  focusIdx = (focusIdx + (code === "ArrowUp" || code === "KeyW" || code === "ArrowLeft" || code === "KeyA" ? -1 : 1) + l.length) % l.length; paintFocus(); }
-function pressFocused() { const l = navList(); (l[focusIdx] || l[0])?.click(); }
+function navList() {
+  const root = !$("skins").classList.contains("hidden") ? "#skins" : state === "menu" ? "#menu" : "#over";
+  return [...document.querySelectorAll(`${root} [data-nav]`)].filter(b => b.offsetParent !== null);
+}
+function paintFocus() {
+  document.querySelectorAll(".focus").forEach(b => b.classList.remove("focus"));
+  if (inputMode !== "keys" && inputMode !== "gamepad") return;
+  const l = navList(); if (l.length) l[clamp(focusIdx, 0, l.length - 1)].classList.add("focus");
+}
+function nav(code) { const l = navList(); if (!l.length) return; focusIdx = (focusIdx + (code === "ArrowUp" || code === "ArrowLeft" || code === "KeyW" || code === "KeyA" ? -1 : 1) + l.length) % l.length; paintFocus(); }
+function pressFocused() { const l = navList(); const b = l[clamp(focusIdx, 0, l.length - 1)]; if (b) b.click(); }
 
-// ---------------------------------------------------------------- UI glue
-const $ = id => document.getElementById(id);
+// =====================================================================
+// UI glue
+// =====================================================================
 function setState(s) {
   state = s;
   $("menu").classList.toggle("hidden", s !== "menu");
   $("hud").classList.toggle("hidden", s === "menu");
   $("over").classList.toggle("hidden", s !== "over");
-  if (s !== "playing") { $("hint").classList.add("hidden"); clearTimeout(bannerTimer); $("banner").style.opacity = 0; }
-  resize();
-  if (s === "menu") { renderMenu(); focusFirst(); }
+  document.body.classList.toggle("playing", s === "playing");
+  if (s !== "playing") joy.finish();
+  layout(); focusIdx = 0; paintFocus();
 }
+function showBanner(title, color, note, icon, size = 64, dur = LV.BannerTime) { G.banner = { title, color, note, icon, size, dur, at: clock }; }
+function levelNote(level, def) {
+  const prev = levelDef(level - 1);
+  if (def.ZoomerEvery && !prev.ZoomerEvery) return ["Zoomers incoming!", "Spicy"];
+  if ((def.Chasers || 0) > 0 && !(prev.Chasers || 0)) return ["Chasers are hunting you!", "Chaser"];
+  if ((def.Chasers || 0) > (prev.Chasers || 0)) return ["More chasers!", null];
+  return ["Faster + more bubbles!", null];
+}
+function onLevel(level, def) {
+  const st = stageFor(level);
+  paintIcon($("hudStage"), st.Icon); $("hudLevel").textContent = "LV " + level; $("hudFill").style.background = css(st.Color);
+  if (level > 1) {
+    const [note, icon] = levelNote(level, def);
+    showBanner("LEVEL " + level, st.Color, note, icon); SFX.LevelUp();
+    const m = $("hudMain"); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash");
+  }
+}
+function onStar() { $("hudGems").textContent = G.stars; }
+let lastHud = "";
 function updateHud() {
-  $("hudScore").textContent = Math.floor(score);
-  $("hudGems").textContent = gemsRun;
-  $("hudLevel").textContent = level;
-  const st = CFG.stages[[5, 3, 1].find(n => level >= n)]; $("hudLevel").style.color = st[1];
-  const a = levelStart(level), b = levelStart(level + 1);
-  $("hudLvBar").style.width = Math.min(100, (t - a) / (b - a) * 100) + "%";
-  $("hudTime").textContent = t.toFixed(1);
+  const sc = String(score()), tm = G.time.toFixed(1) + "s";
+  if (sc + tm !== lastHud) { $("hudScore").textContent = sc; $("hudTime").textContent = tm; lastHud = sc + tm; }
+  const a = startOf(G.level), b = startOf(G.level + 1);
+  $("hudFill").style.width = clamp((G.time - a) / (b - a), 0, 1) * 100 + "%";
 }
-let bannerTimer = 0;
-function showBanner(text, sub, ms, color) {
-  const b = $("banner"); b.innerHTML = text + (sub ? "<small>" + sub + "</small>" : ""); b.style.color = color || "var(--lime)";
-  b.style.opacity = 1; clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.style.opacity = 0, ms);
-}
-let hintTimer = 0;
-function showHint() {
-  if (state !== "playing") return;
-  const h = $("hint");
-  h.textContent = inputMode === "touch" ? "Left thumb = joystick · grab 💎, dodge the rest"
-    : inputMode === "pad" ? "Left stick to move · grab 💎, dodge the rest"
-    : inputMode === "keys" ? "Arrows / WASD · grab 💎, dodge the rest · Esc = pause"
-    : "Steer with your mouse · grab 💎, dodge the rest · Esc = pause";
-  h.classList.remove("hidden"); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => h.style.opacity = 0, 3500);
-}
-function renderMenu() {
-  const ol = $("boardList");
-  ol.innerHTML = save.top.length ? save.top.map((e, i) => `<li><span class="r">${i + 1}.</span><span style="flex:1;color:var(--dim)">LV ${e.lv}</span><span class="s">${e.s}</span></li>`).join("")
-    : '<div class="empty">No runs yet. Hit PLAY!</div>';
-  $("bestLine").innerHTML = save.best ? `YOUR BEST <b>${save.best}</b>` : "";
-  $("gemCount").textContent = "💎 " + save.gems;
-  $("skins").innerHTML = SKINS.map(s => {
-    const owned = save.owned.includes(s.id), on = save.skin === s.id;
-    return `<div class="skin ${on ? "on" : ""} ${owned ? "" : "locked"}" data-skin="${s.id}" role="button" tabindex="0">
-      <div class="dot" style="background:${s.fill};box-shadow:0 0 0 4px ${s.ring};opacity:${s.ghost ? .6 : 1}"></div>
-      ${on ? "ON" : owned ? s.name : "💎 " + s.price}</div>`;
-  }).join("");
-}
-$("skins").addEventListener("click", e => {
-  const el = e.target.closest(".skin"); if (!el) return;
-  const s = SKINS.find(x => x.id === el.dataset.skin);
-  if (save.owned.includes(s.id)) { save.skin = s.id; sfx.click(); }
-  else if (save.gems >= s.price) { save.gems -= s.price; save.owned.push(s.id); save.skin = s.id; sfx.gem(); }
-  else { beep(160, 0.15, "square", 0.05); el.animate([{ transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "none" }], 200); return; }
-  persist(); const idx = focusIdx; renderMenu(); focusIdx = idx; paintFocus();
-});
-function goMenu() { joy.finish(); setState("menu"); }
-function toggleMute() { save.muted = !save.muted; persist(); paintMute(); if (!save.muted) sfx.click(); }
-function paintMute() { for (const id of ["mute", "hudMute"]) { $(id).textContent = save.muted ? "✕" : "♪"; $(id).style.color = save.muted ? "var(--red)" : ""; } }
-const tap = (id, fn) => $(id).addEventListener("click", () => { sfx.click(); fn(); });
-tap("playBtn", startRun); tap("againBtn", startRun); tap("overMenuBtn", goMenu); tap("hudMenu", goMenu); tap("reviveBtn", revive);
-$("mute").addEventListener("click", toggleMute); $("hudMute").addEventListener("click", toggleMute);
-document.addEventListener("visibilitychange", () => { if (document.hidden && state === "playing") paused = true; });
-cv.addEventListener("pointerdown", e => { if (paused && e.pointerType !== "touch") paused = false; });
-window.addEventListener("resize", resize);
 
-// ---------------------------------------------------------------- loop
-let last = performance.now();
+let reviveDeadline = 0;
+function startRun() {
+  resetRun(); setState("playing");
+  $("hudGems").textContent = "0"; lastHud = "";
+  begin(); showBanner("GO!", THEME.Cyan, null, null, 80, 0.9); SFX.Start();
+}
+function onDeath() {
+  const final = score();
+  updateHud();
+  setTimeout(() => {
+    if (!G.dead || state !== "playing") return;
+    save.gems += G.stars - (G.banked || 0); G.banked = G.stars;
+    const isBest = final > save.best; if (isBest) save.best = final;
+    if (G.entry) save.top = save.top.filter(e => e !== G.entry);
+    G.entry = { s: final, lv: G.level }; save.top.push(G.entry); save.top.sort((a, b) => b.s - a.s); save.top = save.top.slice(0, 10);
+    persist();
+    $("overTitle").textContent = OUCH[rndInt(0, OUCH.length - 1)];
+    $("overScore").textContent = final;
+    const ob = $("overBest");
+    if (isBest && final > 0) { ob.textContent = "NEW BEST!"; ob.className = ""; SFX.NewBest(); } else { ob.innerHTML = `Best: ${save.best}`; ob.className = "plain"; }
+    const st = stageFor(G.level);
+    $("overStats").innerHTML = ""; const ic = document.createElement("canvas"); ic.className = "pix"; ic.style.height = "18px"; paintIcon(ic, st.Icon);
+    const gem = document.createElement("canvas"); gem.className = "pix"; gem.style.height = "18px"; paintIcon(gem, "Star");
+    $("overStats").append(ic, ` LV ${G.level} • ${G.time.toFixed(1)}s • `, gem, ` ${G.stars}`);
+    const canRevive = !G.revived && save.gems >= REVIVE.Cost;
+    $("continueWrap").classList.toggle("hidden", !canRevive);
+    $("continueCost").textContent = REVIVE.Cost;
+    reviveDeadline = canRevive ? clock + REVIVE.Window : 0;
+    setState("over");
+    focusIdx = 0; paintFocus();
+  }, 650);
+}
+function act(what) {
+  SFX.Click();
+  if (what === "again") startRun();
+  else if (what === "menu") { setState("menu"); renderMenu(); }
+  else if (what === "continue") {
+    if (G.revived || save.gems < REVIVE.Cost || clock > reviveDeadline) return;
+    save.gems -= REVIVE.Cost; persist();
+    if (G.entry) { save.top = save.top.filter(e => e !== G.entry); G.entry = null; persist(); }
+    setState("playing"); revive();
+  }
+}
+function paintHints() {
+  const hint = inputMode === "touch" ? "Left thumb = joystick • grab 💎, dodge the rest"
+    : inputMode === "gamepad" ? "Left stick to steer • grab 💎, dodge the rest"
+    : inputMode === "keys" ? "Arrow keys / WASD to steer • grab 💎, dodge the rest"
+    : "Steer with your mouse • grab 💎, dodge the rest";
+  $("menuHint").textContent = hint;
+  $("overHint").textContent = inputMode === "gamepad" ? "Ⓐ again   Ⓑ menu" : inputMode === "touch" ? "" : "Space = play again";
+}
+function paintMute() { document.querySelectorAll("canvas[data-sound]").forEach(c => paintIcon(c, save.muted ? "SoundOff" : "SoundOn")); }
+function toggleMute() { save.muted = !save.muted; persist(); paintMute(); if (!save.muted) SFX.Click(); }
+let toastTimer = 0;
+function toast(text) { const t = $("toast"); t.textContent = text; t.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.opacity = 0, 2200); }
+
+function renderMenu() {
+  $("tiles").innerHTML = LV.Stages.map(s => `<div class="tile panel"><div class="bar" style="background:${css(s.Color)}"></div>
+    <canvas class="pix" data-icon="${s.Icon === "Insane" ? "Chaser" : s.Icon}"></canvas><b style="color:${css(s.Color)}">${s.Title}</b><p>${s.Note}</p>
+    <i>LV ${s.From} &nbsp;•&nbsp; ${s.From === 1 ? "START" : startOf(s.From) + "s"}</i></div>`).join("");
+  $("tiles").querySelectorAll("canvas").forEach(c => paintIcon(c, c.dataset.icon));
+  $("bestNum").textContent = save.best;
+  $("boardList").innerHTML = save.top.length
+    ? save.top.map((e, i) => `<li><span class="r">${i + 1}</span><span class="lv">LV ${e.lv}</span><span class="s">${e.s}</span></li>`).join("")
+    : `<div class="empty">No scores yet — be the first!</div>`;
+}
+
+// ---- skins
+function openSkins() { renderShop(); $("skins").classList.remove("hidden"); focusIdx = 0; paintFocus(); }
+function closeSkins() { $("skins").classList.add("hidden"); focusIdx = 1; paintFocus(); }
+function preview(c, kind, item) {
+  const g = c.getContext("2d"); c.width = 240; c.height = 168;
+  if (kind === "skin") {
+    g.fillStyle = "#08182a"; g.fillRect(0, 0, 240, 168);
+    const pts = [[52, 132], [76, 120], [100, 106], [124, 92], [148, 78]];
+    pts.forEach(([x, y], i) => { const col = item.Rainbow ? hsv(i * .16, .75, 1) : item.Alternate ? item.Trail[i % 2] : lerpC(item.Trail[1], item.Trail[0], i / 4);
+      g.fillStyle = css(col, .45 + i * .1); g.beginPath(); g.arc(x, y, 9 + i * 2.5, 0, 7); g.fill(); });
+    g.fillStyle = css(item.Rainbow ? [255, 120, 200] : item.Glow, .45); g.beginPath(); g.arc(164, 70, 46, 0, 7); g.fill();
+    g.fillStyle = css(item.Core); g.beginPath(); g.arc(164, 70, 22, 0, 7); g.fill();
+    g.strokeStyle = css(item.Glow); g.lineWidth = 5; g.beginPath(); g.arc(164, 70, 24, 0, 7); g.stroke();
+  } else {
+    const gr = g.createLinearGradient(0, 0, 0, 168); gr.addColorStop(0, css(item.Top)); gr.addColorStop(1, css(item.Bottom));
+    g.fillStyle = gr; g.fillRect(0, 0, 240, 168);
+    g.fillStyle = css(item.Floor); g.fillRect(36, 34, 168, 100);
+    g.strokeStyle = css(item.Grid, .8); g.lineWidth = 3; g.strokeRect(36, 34, 168, 100);
+    g.fillStyle = css(item.Grid, .4); for (let i = 1; i < 4; i++) g.fillRect(36 + 42 * i, 34, 2, 100);
+  }
+}
+function renderShop() {
+  $("shopGems").textContent = save.gems;
+  const build = (list, kind, owned, equipped, el) => {
+    el.innerHTML = "";
+    for (const it of list) {
+      const d = document.createElement("div"); d.className = "item"; d.dataset.nav = ""; d.tabIndex = 0;
+      const c = document.createElement("canvas"); preview(c, kind, it);
+      const isOwned = owned.includes(it.Id) || !it.Gems, isOn = equipped === it.Id;
+      d.append(c);
+      d.insertAdjacentHTML("beforeend", `<div class="nm">${it.Name}</div><div class="tag ${isOn ? "on" : isOwned ? "own" : ""}">${isOn ? "EQUIPPED" : isOwned ? "EQUIP" : it.Gems + " GEMS"}</div>${it.Featured && !isOwned ? '<div class="feat">FEATURED</div>' : ""}`);
+      d.addEventListener("click", () => buy(kind, it));
+      el.append(d);
+    }
+  };
+  build(SKINS, "skin", save.skins, save.skin, $("skinItems"));
+  build(THEMES, "theme", save.themes, save.theme, $("themeItems"));
+  paintFocus();
+}
+function buy(kind, it) {
+  const owned = kind === "skin" ? save.skins : save.themes;
+  if (!owned.includes(it.Id) && it.Gems) {
+    if (save.gems < it.Gems) { tone(170, .15, { vol: .05 }); toast(`You need ${it.Gems - save.gems} more gems`); return; }
+    save.gems -= it.Gems; owned.push(it.Id); SFX.Star();
+  } else SFX.Click();
+  if (kind === "skin") save.skin = it.Id; else save.theme = it.Id;
+  persist(); const f = focusIdx; renderShop(); focusIdx = f; paintFocus();
+}
+
+// buttons
+const on = (id, fn) => $(id).addEventListener("click", fn);
+on("playBtn", () => { SFX.Click(); startRun(); });
+on("skinsBtn", () => { SFX.Click(); openSkins(); });
+on("skinsClose", () => { SFX.Click(); closeSkins(); });
+on("againBtn", () => act("again"));
+on("overMenuBtn", () => act("menu"));
+on("continueBtn", () => act("continue"));
+on("hudMenu", () => { if (state === "playing" && !G.dead) { G.running = false; G.dead = true; } act("menu"); });
+on("muteMenu", toggleMute); on("hudMute", toggleMute);
+$("skins").addEventListener("click", e => { if (e.target.id === "skins") closeSkins(); });
+window.addEventListener("resize", layout);
+
+// =====================================================================
+// main loop
+// =====================================================================
+let last = performance.now(), lastDt = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.min(0.25, (now - last) / 1000); last = now; lastDt = dt; clock += dt;
   pollPad();
-  if (state === "playing" && !paused) update(dt);
-  else if (state === "over") { updateParticles(dt); shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt * 3); }
-  draw();
-  if (paused && state === "playing") { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#0009"; ctx.fillRect(0, 0, vw, vh);
-    ctx.fillStyle = "#f2fffd"; ctx.font = "18px 'Press Start 2P', monospace"; ctx.textAlign = "center"; ctx.fillText("PAUSED", vw / 2, vh / 2 - 14);
-    ctx.font = "11px 'Press Start 2P', monospace"; ctx.fillStyle = "#8fb9b5"; ctx.fillText(inputMode === "touch" ? "TAP TO KEEP GOING" : inputMode === "pad" ? "PRESS A TO KEEP GOING" : "CLICK OR PRESS ANY KEY", vw / 2, vh / 2 + 18); }
+  if (state === "playing" && !paused) {
+    let target = null, instant = false;
+    if (inputMode === "mouse") { target = mouseTarget; instant = true; }
+    else {
+      const v = inputMode === "touch" ? joy.vector() : stickVector(), sp = inputMode === "touch" ? IN.JoySpeed : IN.PadSpeed;
+      padTarget.x = clamp(padTarget.x + v.x * sp * dt, A.BlipRadius, W - A.BlipRadius);
+      padTarget.y = clamp(padTarget.y + v.y * sp * dt, A.BlipRadius, H - A.BlipRadius);
+      target = padTarget;
+    }
+    if (inputMode === "mouse" && mouseTarget) padTarget = { x: G.blip.x, y: G.blip.y };
+    update(dt, target, instant);
+    if (G.running) updateHud();
+  }
+  if (!paused) { for (const f of effects) f.t += dt; effects = effects.filter(f => f.t < f.dur); if (shakeT >= 0) shakeT += dt; }
+  if (state === "over") {
+    const left = reviveDeadline - clock;
+    if (reviveDeadline && left <= 0) { reviveDeadline = 0; $("continueWrap").classList.add("hidden"); paintFocus(); }
+    if (reviveDeadline) $("continueBar").style.width = clamp(left / REVIVE.Window, 0, 1) * 100 + "%";
+  }
+  drawBackground();
+  if (state !== "menu") { drawArena(); if (inputMode === "touch") drawJoystick(); }
+  if (paused && state === "playing") drawPause();
   requestAnimationFrame(frame);
 }
-paintMute();
+
+resetRun();
+paintMute(); paintHints(); renderMenu();
+document.body.classList.toggle("mouse", inputMode === "mouse");
 setState("menu");
 requestAnimationFrame(frame);
 
 // Store screenshots only: index.html#shot (gameplay) or #cover (gameplay + logo). Never used in normal play.
 if (location.hash === "#shot" || location.hash === "#cover") {
-  startRun(); t = levelStart(5) + 2; setLevel(5); addZoomer();
-  for (let i = 0; i < 260; i++) { inv = 99; target = { x: 500 + Math.cos(i / 40) * 260, y: 312 + Math.sin(i / 30) * 160 }; update(0.016); }
-  inv = 0; zoomers.forEach(z => z.warn = 0); gemsRun = 7; score = t * 10 + 7 * CFG.gemValue; updateHud(); popup(blip.x + 40, blip.y - 30, "+25", "#3ff2e6");
-  update = () => {};
-  $("hint").classList.add("hidden"); $("banner").style.opacity = 0;
+  startRun(); inputMode = "keys";
+  for (let i = 0; i < 2400 && G.level < 5; i++) { G.shieldUntil = G.time + 1; padTarget = { x: 500 + Math.cos(i / 60) * 300, y: 312 + Math.sin(i / 45) * 180 }; update(1 / 60, padTarget, false); }
+  for (let i = 0; i < 180; i++) { G.shieldUntil = G.time + 1; update(1 / 60, padTarget, false); }
+  // park the blip in the most open spot so the screenshot reads clearly
+  let best = null, bestD = -1;
+  for (let i = 0; i < 400; i++) { const p = { x: rnd(80, W - 80), y: rnd(80, H - 80) };
+    const d = Math.min(...G.ents.map(e => len(e.x - p.x, e.y - p.y) - e.r)); if (d > bestD) { bestD = d; best = p; } }
+  G.blip = best; G.hist = G.hist.map((_, i) => ({ x: best.x - 9 * i, y: best.y + 5 * i }));
+  G.shieldUntil = null; G.banner = null; G.stars = 6; onStar(); updateHud(); effects = [];
+  if (!G.star) spawnStar();
+  floatText(G.blip.x + 30, G.blip.y - 30, "+50", THEME.Yellow); effects[0].t = .2;
+  window.update = () => {}; G.running = false; effects.forEach(f => f.dur = 1e9);
   if (location.hash === "#cover") {
-    $("hud").classList.add("hidden"); state = "menu"; demo = []; resize(); state = "playing";
+    $("hud").classList.add("hidden");
     const c = document.createElement("div");
-    c.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(#04110fcc 30%,#04110f55 75%);pointer-events:none";
-    c.innerHTML = '<h1 class="logo" style="font-size:64px">BLIP<br>PANIC</h1><p class="sub" style="font-size:20px;color:#f2fffd">Grab the gems. Dodge everything else.</p>';
+    c.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(rgba(6,20,32,.75) 25%,rgba(6,20,32,0) 70%);pointer-events:none";
+    c.innerHTML = '<h1 id="title" style="font-size:58px;animation:none">BLIP<br>PANIC!</h1><p id="subtitle" style="font-size:22px;margin:0">Dodge the bubbles • Grab the gems</p>';
     document.body.appendChild(c);
   }
 }

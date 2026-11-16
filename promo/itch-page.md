@@ -23,26 +23,27 @@ Grab the gems. Dodge everything else.
 
 **You are a tiny blip. Everything else wants you gone.**
 
-Steer your blip around the arena, grab the 💎 gems and don't touch anything else. Every few seconds the level goes up and the arena gets meaner.
+Steer your blip around the arena, grab the 💎 gems and don't touch anything else. The arena levels up every few seconds and gets meaner.
 
-- **Level 1: Bubbles.** They bounce off the walls and get faster.
-- **Level 3: Zoomers.** A red lane flashes, then something comes flying through it.
-- **Level 5: Chasers.** Little monsters that follow you around.
+- **Warm-up (level 1):** shiny bubbles bounce around, off the walls and off each other like pool balls.
+- **Zoomers (level 3):** a ring flashes, then a fast one shoots across, usually right at you.
+- **Chasers (level 5):** little monsters that hunt you down for a while.
 
-After level 10 it just keeps getting harder. How long can you last?
+Hiding in a corner? The corner heats up, flashes **MOVE!**, and sends a zoomer your way.
+
+After level 10 it keeps getting harder. How long can you last?
 
 **Scoring**
 - +10 points every second you survive
-- +25 for every gem
-- +5 for a close call (let something brush past you)
+- +50 for every gem (they fade after a few seconds)
 
-Spend gems on new blip skins, or on a revive when a run ends.
+Spend gems on blip skins (Ice, Fire, Glitch, Rainbow), arena themes (Deep Space, Neon City), or a **CONTINUE** when you get hit.
 
 **Controls**
-- Mouse: the blip follows your cursor
+- Mouse: the blip sits right on your cursor
 - Phone / tablet: put your left thumb down anywhere for a joystick
 - Keyboard: arrow keys or WASD
-- Controller: left stick, A to select, Start to pause
+- Controller: left stick, A to select, B back, Start to pause
 - Esc or P: pause · M: mute
 
 Scores, gems and skins are saved in your browser.
