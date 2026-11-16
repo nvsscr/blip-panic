@@ -293,7 +293,7 @@
 const rgb = (r, g, b) => [r, g, b];
 const W = 1000, H = 625;
 const A = { BlipRadius: 11, HitForgiveness: 3, FollowSharpness: 30, TrailLength: 10, SmallScreenBlipScale: 1.4 };
-const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 750, SmallScreen: 500 };
+const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 820, SmallScreen: 500 };
 const LV = {
   Every: 8, SpeedEase: 1.5, BannerTime: 1.4,
   Levels: [
@@ -914,8 +914,9 @@ const joy = {
   move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = len(dx, dy); if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
   finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
   active() { return this.id !== null; },
-  vector() { const m = len(this.dx, this.dy) / this.r; if (m < IN.JoyDeadzone) return { x: 0, y: 0 };
-    const k = (m - IN.JoyDeadzone) / (1 - IN.JoyDeadzone) / m; return { x: this.dx / this.r * k, y: this.dy / this.r * k }; },
+  // constant speed: past the deadzone the stick only picks a direction, never a slower speed
+  vector() { const d = len(this.dx, this.dy); if (d / this.r < IN.JoyDeadzone) return { x: 0, y: 0 };
+    return { x: this.dx / d, y: this.dy / d }; },
 };
 
 // =====================================================================
@@ -1219,7 +1220,7 @@ function frame(now) {
       const v = inputMode === "touch" ? joy.vector() : stickVector(), sp = inputMode === "touch" ? IN.JoySpeed : IN.PadSpeed;
       padTarget.x = clamp(padTarget.x + v.x * sp * dt, A.BlipRadius, W - A.BlipRadius);
       padTarget.y = clamp(padTarget.y + v.y * sp * dt, A.BlipRadius, H - A.BlipRadius);
-      target = padTarget;
+      target = padTarget; instant = inputMode === "touch"; // no easing: the blip moves at one steady speed
     }
     if (inputMode === "mouse" && mouseTarget) padTarget = { x: G.blip.x, y: G.blip.y };
     if (DEMO) target = demoPilot();
