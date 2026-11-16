@@ -84,6 +84,16 @@
   .board .foot { text-align: center; color: var(--muted); font-size: min(1.1vw, 2vh); margin-top: 1vh; }
   .hint { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: min(1.7vw, 3vh); }
   #muteMenu { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 62px; height: 56px; }
+  #deviceMenu { position: fixed; left: calc(max(14px, env(safe-area-inset-left)) + 76px); bottom: max(14px, env(safe-area-inset-bottom)); height: 56px; font-size: 12px; }
+  #device { display: grid; place-items: center; background: rgba(6,20,32,.55); z-index: 30; }
+  .pick { padding: 26px 30px 30px; text-align: center; width: min(640px, 100%); }
+  .pick h2 { font-family: var(--title); color: var(--cyan); font-size: min(26px, 5vw); margin: 0 0 8px; }
+  .pick p { color: var(--muted); margin: 0 0 22px; font-size: 17px; }
+  .pickRow { display: flex; gap: 18px; }
+  .pickRow .btn { flex: 1; height: 170px; }
+  .pickRow .btn > span { flex-direction: column; gap: 12px; font-size: min(17px, 2.6vw); white-space: nowrap; }
+  .pickRow small { font-family: var(--body); font-size: 15px; font-weight: 500; opacity: .85; }
+  .pickRow svg { width: 52px; height: 52px; }
 
   /* HUD */
   #hud { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
@@ -111,7 +121,11 @@
   #overBest.plain { background: none; color: var(--muted); font-family: var(--body); font-size: 16px; padding: 0; }
   #overStats { font-size: 17px; display: flex; align-items: center; gap: 6px; }
   #continueWrap { width: 88%; display: flex; flex-direction: column; gap: 10px; }
-  #continueBtn { height: 56px; font-size: 13px; width: 100%; }
+  .contBtns { display: flex; gap: 10px; }
+  #continueBtn, #continueAdBtn { height: 56px; font-size: 13px; flex: 1; }
+  .btn.cyan { --face: var(--cyan); --base: #00808f; }
+  .contBtns .btn > span { white-space: nowrap; padding: 0 .5em; font-size: 11px; gap: .35em; }
+  #adBlock { position: fixed; inset: 0; z-index: 40; background: rgba(6,20,32,.35); }
   .timerBar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
   .timerBar i { display: block; height: 100%; background: var(--yellow); width: 100%; }
   .overBtns { display: flex; gap: 14px; margin-top: 6px; }
@@ -146,13 +160,16 @@
   @media (max-height: 500px) {
     #menu { row-gap: 1vh; padding-top: max(1.5vh, env(safe-area-inset-top)); }
     #muteMenu { width: 48px; height: 44px; }
+    #deviceMenu { height: 44px; left: calc(max(14px, env(safe-area-inset-left)) + 58px); font-size: 10px; }
+    .pick { padding: 14px 18px 18px; } .pick p { margin-bottom: 12px; font-size: 14px; }
+    .pickRow .btn { height: 120px; } .pickRow svg { width: 36px; height: 36px; }
     .hudMain { height: 46px; gap: 10px; padding: 0 10px; }
     .lvChip .row { font-size: 9px; } #hudScore { font-size: 17px; } .gems { font-size: 12px; }
     #hudTime { height: 46px; font-size: 11px; min-width: 74px; padding: 0 8px; }
     #hud .btn { height: 46px; } #hudMute { width: 48px; } #hudMenu { font-size: 11px; }
     .card { padding: 12px 16px 16px; gap: 7px; }
     #overTitle { font-size: 20px; } #overScore { font-size: 30px; } #overStats { font-size: 14px; }
-    #againBtn, #overMenuBtn { height: 48px; font-size: 12px; } #continueBtn { height: 44px; font-size: 10px; }
+    #againBtn, #overMenuBtn { height: 48px; font-size: 12px; } #continueBtn, #continueAdBtn { height: 44px; font-size: 10px; }
     #overHint { display: none; }
     .shop { padding: 12px 16px; } .shop h3 { margin: 8px 0 6px; } .items { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   }
@@ -183,6 +200,7 @@
   </div>
   <div class="hint" id="menuHint">Steer with your mouse • grab 💎, dodge the rest</div>
   <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
+  <button class="btn sec" id="deviceMenu" data-nav><span id="deviceLabel">PC</span></button>
 </div>
 
 <div id="hud" class="layer hidden">
@@ -205,7 +223,10 @@
     <div id="overBest"></div>
     <div id="overStats"></div>
     <div id="continueWrap">
-      <button class="btn gold" id="continueBtn" data-nav><span>CONTINUE · <canvas class="pix" data-icon="Star" style="height:16px"></canvas> <b id="continueCost">15</b></span></button>
+      <div class="contBtns">
+        <button class="btn gold" id="continueBtn" data-nav><span>CONTINUE · <canvas class="pix" data-icon="Star" style="height:16px"></canvas> <b id="continueCost">15</b></span></button>
+        <button class="btn cyan hidden" id="continueAdBtn" data-nav><span>▶ FREE CONTINUE</span></button>
+      </div>
       <div class="timerBar"><i id="continueBar"></i></div>
     </div>
     <div class="overBtns">
@@ -225,7 +246,22 @@
   </div>
 </div>
 
+<div id="device" class="layer hidden">
+  <div class="pick panel">
+    <h2>HOW ARE YOU PLAYING?</h2>
+    <p>Pick one. You can change it later on the menu.</p>
+    <div class="pickRow">
+      <button class="btn cyan" id="pickPhone" data-nav><span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#061420" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><circle cx="12" cy="17.5" r="1"/></svg>
+        PHONE / TABLET<small>Thumb joystick</small></span></button>
+      <button class="btn" id="pickPc" data-nav><span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#061420" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="3" width="20" height="13" rx="2"/><path d="M8 21h8M12 16v5"/></svg>
+        PC<small>Blip follows your mouse</small></span></button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
+<div id="adBlock" class="hidden"></div>
 <div id="rotate"><div style="font-size:40px">⟳</div>Turn your phone sideways<br>to play</div>
 
 <script>
@@ -343,7 +379,7 @@ const stageFor = n => { let s = LV.Stages[0]; for (const x of LV.Stages) if (n >
 // save (this device only)
 // =====================================================================
 const SAVE_KEY = "blipPanic.v2";
-let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false };
+let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false, device: null };
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
 const skinDef = () => SKINS.find(s => s.Id === save.skin) || SKINS[0];
@@ -353,8 +389,9 @@ const themeDef = () => THEMES.find(s => s.Id === save.theme) || THEMES[0];
 // sounds (little synth versions of the Roblox sounds)
 // =====================================================================
 let actx = null;
+const silent = () => save.muted || CG.sdkMuted || CG.adPlaying;
 function tone(freq, dur, { type = "square", vol = 0.05, slide = 0, delay = 0 } = {}) {
-  if (save.muted) return;
+  if (silent()) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
@@ -366,7 +403,7 @@ function tone(freq, dur, { type = "square", vol = 0.05, slide = 0, delay = 0 } =
   } catch (e) {}
 }
 function noise(dur, vol = 0.12) {
-  if (save.muted) return;
+  if (silent()) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const n = actx.sampleRate * dur, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
@@ -396,7 +433,7 @@ const cv = $("game"), ctx = cv.getContext("2d");
 let vw = 0, vh = 0, dpr = 1, ax = 0, ay = 0, as = 1; // arena -> screen: x*as + ax
 let small = false;
 function layout() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  dpr = DEMO ? 1 : Math.min(window.devicePixelRatio || 1, 2); // trailers record at exactly 1080p
   vw = window.innerWidth; vh = window.innerHeight; small = vh < IN.SmallScreen;
   cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
   let top = 12;
@@ -414,6 +451,41 @@ const rings = Array.from({ length: 10 }, (_, i) => ({ x: rnd(.02, .98), s: rnd(.
 // =====================================================================
 // game state
 // =====================================================================
+// =====================================================================
+// CrazyGames SDK. The script tag is only added to the CrazyGames build (build.py);
+// everywhere else window.CrazyGames is missing and all of this does nothing.
+// =====================================================================
+const CG = {
+  ready: false, sdk: null, sdkMuted: false, adPlaying: false, playing: false,
+  async init() {
+    try {
+      const s = window.CrazyGames && window.CrazyGames.SDK; if (!s) return;
+      await s.init();
+      if (s.environment === "disabled") return;
+      this.sdk = s; this.ready = true;
+      this.sdkMuted = !!(s.game.settings && s.game.settings.muteAudio);
+      s.game.addSettingsChangeListener(n => { this.sdkMuted = !!n.muteAudio; });
+    } catch (e) { this.ready = false; }
+  },
+  call(fn) { if (!this.ready) return; try { fn(this.sdk); } catch (e) {} },
+  // gameplayStart / gameplayStop only when real play starts or stops (not on tab switches)
+  setPlaying(on) { if (on === this.playing) return; this.playing = on; this.call(s => on ? s.game.gameplayStart() : s.game.gameplayStop()); },
+  happytime() { this.call(s => s.game.happytime()); },
+  // resolves true only when the ad really finished (rewarded = give the reward)
+  ad(type) {
+    return new Promise(done => {
+      if (!this.ready) return done(false);
+      $("adBlock").classList.remove("hidden");
+      const end = ok => { this.adPlaying = false; $("adBlock").classList.add("hidden"); done(ok); };
+      try {
+        this.sdk.ad.requestAd(type, { adStarted: () => { this.adPlaying = true; }, adFinished: () => end(true), adError: () => end(false) });
+      } catch (e) { end(false); }
+    });
+  },
+};
+let DEMO = false; // trailer recording mode (#video): the blip steers itself and can't be hit
+let userPaused = false; // paused with Esc / P / Start (a tab switch also pauses, but that is not a gameplay stop)
+
 let state = "menu"; // menu | playing | over
 let paused = false, inputMode = matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
 const G = {}; // the run
@@ -573,7 +645,7 @@ function step(dt) {
       e.x += e.vx * dt; e.y += e.vy * dt; e.life -= dt;
       if (e.life <= 0) { burst(e.x, e.y, e.color, 8, 60); remove = true; }
     }
-    if (!remove && !shielded() && len(e.x - G.blip.x, e.y - G.blip.y) < e.r + hitR) { die(e); return true; }
+    if (!remove && !shielded() && !DEMO && len(e.x - G.blip.x, e.y - G.blip.y) < e.r + hitR) { die(e); return true; }
     if (remove) { G.ents.splice(i, 1); i--; }
   }
   if (E.BubbleCollisions) collideBubbles();
@@ -799,7 +871,7 @@ function drawPause() {
 const joy = {
   id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
   fit() { this.r = clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
-  inZone(x) { return x <= vw * IN.JoyZone; },
+  inZone(x) { return save.device === "phone" || x <= vw * IN.JoyZone; },
   begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = clamp(y, this.r + 4, vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
   move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = len(dx, dy); if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
   finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
@@ -820,12 +892,12 @@ function setInputMode(m) {
 }
 const toArena = (x, y) => ({ x: (x - ax) / as, y: (y - ay) / as });
 window.addEventListener("pointermove", e => {
-  if (e.pointerType === "touch") return;
+  if (e.pointerType === "touch" || save.device === "phone") return;
   if (inputMode !== "mouse" && Math.abs(e.movementX) + Math.abs(e.movementY) < 4) return;
   setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
 });
 cv.addEventListener("pointerdown", e => {
-  if (e.pointerType === "touch") return;
+  if (e.pointerType === "touch" || save.device === "phone") return;
   setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
   if (paused) paused = false;
 });
@@ -847,9 +919,10 @@ window.addEventListener("keydown", e => {
   if (e.code === "KeyM") { toggleMute(); return; }
   if (state === "playing") {
     if (MOVE_KEYS.includes(e.code)) { setInputMode("keys"); e.preventDefault(); }
-    if (e.code === "Escape" || e.code === "KeyP") { paused = !paused; joy.finish(); }
+    if (e.code === "Escape" || e.code === "KeyP") { paused = !paused; userPaused = paused; joy.finish(); }
     return;
   }
+  if (!$("device").classList.contains("hidden")) { if (e.code === "Escape" && save.device) pick(save.device); else if (MOVE_KEYS.includes(e.code)) { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") setInputMode("keys"); else nav(e.code); } else if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); pressFocused(); } return; }
   if (!$("skins").classList.contains("hidden") && e.code === "Escape") { closeSkins(); return; }
   if (state === "over" && e.code === "Space") { e.preventDefault(); act("again"); return; }
   if (state === "over" && e.code === "Escape") { act("menu"); return; }
@@ -881,7 +954,7 @@ function pollPad() {
   const ay2 = gp.axes[1] || 0, ax2 = gp.axes[0] || 0;
   if ((len(ax2, ay2) > 0.4 || [0, 1, 9, 12, 13, 14, 15].some(pr)) && inputMode !== "gamepad") setInputMode("gamepad");
   if (state === "playing") {
-    if (edge(9)) paused = !paused; else if (paused && edge(0)) paused = false;
+    if (edge(9)) { paused = !paused; userPaused = paused; } else if (paused && edge(0)) paused = false;
   } else {
     if (edge(0)) pressFocused();
     if (edge(1)) { if (!$("skins").classList.contains("hidden")) closeSkins(); else if (state === "over") act("menu"); }
@@ -895,7 +968,7 @@ function pollPad() {
 // focus for keyboard / controller
 let focusIdx = 0;
 function navList() {
-  const root = !$("skins").classList.contains("hidden") ? "#skins" : state === "menu" ? "#menu" : "#over";
+  const root = !$("device").classList.contains("hidden") ? "#device" : !$("skins").classList.contains("hidden") ? "#skins" : state === "menu" ? "#menu" : "#over";
   return [...document.querySelectorAll(`${root} [data-nav]`)].filter(b => b.offsetParent !== null);
 }
 function paintFocus() {
@@ -963,22 +1036,41 @@ function onDeath() {
     $("overTitle").textContent = OUCH[rndInt(0, OUCH.length - 1)];
     $("overScore").textContent = final;
     const ob = $("overBest");
-    if (isBest && final > 0) { ob.textContent = "NEW BEST!"; ob.className = ""; SFX.NewBest(); } else { ob.innerHTML = `Best: ${save.best}`; ob.className = "plain"; }
+    if (isBest && final > 0) { ob.textContent = "NEW BEST!"; ob.className = ""; SFX.NewBest(); CG.happytime(); } else { ob.innerHTML = `Best: ${save.best}`; ob.className = "plain"; }
     const st = stageFor(G.level);
     $("overStats").innerHTML = ""; const ic = document.createElement("canvas"); ic.className = "pix"; ic.style.height = "18px"; paintIcon(ic, st.Icon);
     const gem = document.createElement("canvas"); gem.className = "pix"; gem.style.height = "18px"; paintIcon(gem, "Star");
     $("overStats").append(ic, ` LV ${G.level} • ${G.time.toFixed(1)}s • `, gem, ` ${G.stars}`);
-    const canRevive = !G.revived && save.gems >= REVIVE.Cost;
+    const canGems = !G.revived && save.gems >= REVIVE.Cost;
+    const canAd = !G.revived && CG.ready && G.time >= 15;
+    $("continueBtn").classList.toggle("hidden", !canGems);
+    $("continueAdBtn").classList.toggle("hidden", !canAd);
+    const canRevive = canGems || canAd;
     $("continueWrap").classList.toggle("hidden", !canRevive);
+    G.adOffered = canAd; G.watchedAd = false;
     $("continueCost").textContent = REVIVE.Cost;
     reviveDeadline = canRevive ? clock + REVIVE.Window : 0;
     setState("over");
     focusIdx = 0; paintFocus();
   }, 650);
 }
-function act(what) {
+let adBusy = false;
+async function act(what) {
+  if (adBusy) return;
   SFX.Click();
-  if (what === "again") startRun();
+  if (what === "again") {
+    // a short ad between runs (the SDK spaces them out itself); never right after a rewarded ad
+    if (CG.ready && !G.watchedAd && G.time >= 10) { adBusy = true; reviveDeadline = 0; await CG.ad("midgame"); adBusy = false; }
+    startRun();
+  }
+  else if (what === "continueAd") {
+    if (G.revived || clock > reviveDeadline) return;
+    adBusy = true; const left = reviveDeadline - clock; reviveDeadline = 1e9;
+    const ok = await CG.ad("rewarded"); adBusy = false;
+    if (ok && state === "over") { G.watchedAd = true; if (G.entry) { save.top = save.top.filter(e => e !== G.entry); G.entry = null; persist(); }
+      setState("playing"); revive(); showBanner("CONTINUE!", THEME.Cyan, null, null, 56, 1); }
+    else { reviveDeadline = clock + Math.max(2, left); toast("No ad right now - try the gems continue"); $("continueAdBtn").classList.add("hidden"); paintFocus(); }
+  }
   else if (what === "menu") { setState("menu"); renderMenu(); }
   else if (what === "continue") {
     if (G.revived || save.gems < REVIVE.Cost || clock > reviveDeadline) return;
@@ -988,7 +1080,7 @@ function act(what) {
   }
 }
 function paintHints() {
-  const hint = inputMode === "touch" ? "Left thumb = joystick • grab 💎, dodge the rest"
+  const hint = inputMode === "touch" ? (save.device === "phone" ? "Thumb anywhere = joystick • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
     : inputMode === "gamepad" ? "Left stick to steer • grab 💎, dodge the rest"
     : inputMode === "keys" ? "Arrow keys / WASD to steer • grab 💎, dodge the rest"
     : "Steer with your mouse • grab 💎, dodge the rest";
@@ -1068,6 +1160,7 @@ on("skinsClose", () => { SFX.Click(); closeSkins(); });
 on("againBtn", () => act("again"));
 on("overMenuBtn", () => act("menu"));
 on("continueBtn", () => act("continue"));
+on("continueAdBtn", () => act("continueAd"));
 on("hudMenu", () => { if (state === "playing" && !G.dead) { G.running = false; G.dead = true; } act("menu"); });
 on("muteMenu", toggleMute); on("hudMute", toggleMute);
 $("skins").addEventListener("click", e => { if (e.target.id === "skins") closeSkins(); });
@@ -1090,6 +1183,7 @@ function frame(now) {
       target = padTarget;
     }
     if (inputMode === "mouse" && mouseTarget) padTarget = { x: G.blip.x, y: G.blip.y };
+    if (DEMO) target = demoPilot();
     update(dt, target, instant);
     if (G.running) updateHud();
   }
@@ -1099,17 +1193,80 @@ function frame(now) {
     if (reviveDeadline && left <= 0) { reviveDeadline = 0; $("continueWrap").classList.add("hidden"); paintFocus(); }
     if (reviveDeadline) $("continueBar").style.width = clamp(left / REVIVE.Window, 0, 1) * 100 + "%";
   }
+  CG.setPlaying(state === "playing" && !G.dead && !(paused && userPaused));
+  if (!paused) userPaused = false;
   drawBackground();
   if (state !== "menu") { drawArena(); if (inputMode === "touch") drawJoystick(); }
   if (paused && state === "playing") drawPause();
+  if (DEMO) drawDemoTitle();
   requestAnimationFrame(frame);
 }
 
+document.addEventListener("touchend", () => { if (actx && actx.state === "suspended") actx.resume(); }, { passive: true });
+function setDevice(d) {
+  save.device = d; persist();
+  $("deviceLabel").textContent = d === "phone" ? "📱 PHONE" : "🖥 PC";
+  setInputMode(d === "phone" ? "touch" : "mouse");
+}
+function showPicker() { $("device").classList.remove("hidden"); focusIdx = matchMedia("(pointer: coarse)").matches ? 0 : 1; paintFocus(); }
+function pick(d) { SFX.Click(); setDevice(d); $("device").classList.add("hidden"); focusIdx = 0; paintFocus(); }
+on("pickPhone", () => pick("phone"));
+on("pickPc", () => pick("pc"));
+on("deviceMenu", () => { SFX.Click(); showPicker(); });
+CG.init().then(() => {
+  if (!save.device && CG.ready) { // CrazyGames knows the device: don't add a click before play
+    const t = CG.sdk.user && CG.sdk.user.systemInfo && CG.sdk.user.systemInfo.device && CG.sdk.user.systemInfo.device.type;
+    if (t) setDevice(t === "mobile" || t === "tablet" ? "phone" : "pc");
+  }
+  if (DEMO || /^#(shot|cover|video|menu)$/.test(location.hash)) return; // store art: no picker
+  if (save.device) setDevice(save.device); else showPicker();
+});
 resetRun();
 paintMute(); paintHints(); renderMenu();
 document.body.classList.toggle("mouse", inputMode === "mouse");
 setState("menu");
 requestAnimationFrame(frame);
+
+// ---- trailer mode: a little autopilot that dodges and chases gems
+function demoPilot() {
+  let fx = 0, fy = 0; const b = G.blip;
+  for (const e of G.ents) {
+    const dx = b.x - e.x, dy = b.y - e.y, d = Math.max(1, len(dx, dy) - e.r), reach = e.kind === "Zoomer" ? 260 : 150;
+    if (d < reach) { const k = Math.pow((reach - d) / reach, 2) * (e.warn != null ? 0.6 : 1.4); fx += dx / (d + e.r) * k; fy += dy / (d + e.r) * k; }
+    if (e.kind === "Zoomer" && e.warn == null) { const ahead = (b.x - e.x) * e.dx + (b.y - e.y) * e.dy; if (ahead > 0 && ahead < 420) { const side = (b.x - e.x) * -e.dy + (b.y - e.y) * e.dx; fx += -e.dy * Math.sign(side || 1) * 1.6; fy += e.dx * Math.sign(side || 1) * 1.6; } }
+  }
+  const m = 90; if (b.x < m) fx += (m - b.x) / m; if (b.x > W - m) fx -= (b.x - W + m) / m; if (b.y < m) fy += (m - b.y) / m; if (b.y > H - m) fy -= (b.y - H + m) / m;
+  const goal = G.star || { x: W / 2 + Math.cos(clock * .7) * 220, y: H / 2 + Math.sin(clock * .9) * 140 };
+  const gx = goal.x - b.x, gy = goal.y - b.y, gd = Math.max(1, len(gx, gy)); fx += gx / gd * 0.55; fy += gy / gd * 0.55;
+  const f = Math.max(0.001, len(fx, fy)), step = Math.min(70, 30 + f * 40);
+  return { x: b.x + fx / f * step, y: b.y + fy / f * step };
+}
+let demoStart = 0;
+function drawDemoTitle() { // the trailer opens on the cover, then fades into play
+  const t = clock - demoStart, a = t < 1.2 ? 1 : Math.max(0, 1 - (t - 1.2) / 0.5); if (a <= 0) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = a;
+  const g0 = ctx.createRadialGradient(vw / 2, vh / 2, 0, vw / 2, vh / 2, Math.max(vw, vh) * .6); g0.addColorStop(0, "rgba(6,20,32,.8)"); g0.addColorStop(1, "rgba(6,20,32,0)");
+  ctx.fillStyle = g0; ctx.fillRect(0, 0, vw, vh);
+  const size = Math.min(vw * .11, vh * .13); ctx.font = `${size}px "Press Start 2P", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const g = ctx.createLinearGradient(0, vh / 2 - size * 1.4, 0, vh / 2 + size * 1.4); g.addColorStop(0, "#00ebff"); g.addColorStop(1, "#96ff46");
+  ctx.lineJoin = "round"; ctx.lineWidth = size * .14; ctx.strokeStyle = css(THEME.Ink);
+  for (const [txt, y] of [["BLIP", vh / 2 - size * .7], ["PANIC!", vh / 2 + size * .7]]) { ctx.strokeText(txt, vw / 2, y); ctx.fillStyle = g; ctx.fillText(txt, vw / 2, y); }
+  ctx.globalAlpha = 1;
+}
+if (location.hash === "#video") {
+  DEMO = true; inputMode = "keys"; save.muted = true; save.theme = "Ocean"; save.skin = "Classic";
+  startRun();
+  for (let i = 0; i < 60 * 14; i++) update(1 / 60, demoPilot(), false); // jump in at ~14 s (zoomers already on)
+  G.banner = null; effects = [];
+  $("hud").classList.add("hidden"); layout();
+  document.fonts.ready.then(() => {
+    demoStart = clock;
+    const rec = new MediaRecorder(cv.captureStream(60), { mimeType: MediaRecorder.isTypeSupported("video/mp4;codecs=avc1") ? "video/mp4;codecs=avc1" : "video/webm;codecs=vp9", videoBitsPerSecond: 12e6 });
+    const parts = []; rec.ondataavailable = e => parts.push(e.data);
+    rec.onstop = async () => { const blob = new Blob(parts, { type: rec.mimeType }); fetch("http://localhost:8799/" + (vw > vh ? "landscape" : "portrait") + (rec.mimeType.includes("mp4") ? ".mp4" : ".webm"), { method: "POST", body: await blob.arrayBuffer() }).then(() => document.title = "SAVED"); };
+    rec.start(); setTimeout(() => rec.stop(), 19500);
+  });
+}
 
 // Store screenshots only: index.html#shot (gameplay) or #cover (gameplay + logo). Never used in normal play.
 if (location.hash === "#shot" || location.hash === "#cover") {
@@ -1126,10 +1283,11 @@ if (location.hash === "#shot" || location.hash === "#cover") {
   floatText(G.blip.x + 30, G.blip.y - 30, "+50", THEME.Yellow); effects[0].t = .2;
   window.update = () => {}; G.running = false; effects.forEach(f => f.dur = 1e9);
   if (location.hash === "#cover") {
+    effects = [];
     $("hud").classList.add("hidden");
     const c = document.createElement("div");
     c.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(rgba(6,20,32,.75) 25%,rgba(6,20,32,0) 70%);pointer-events:none";
-    c.innerHTML = '<h1 id="title" style="font-size:58px;animation:none">BLIP<br>PANIC!</h1><p id="subtitle" style="font-size:22px;margin:0">Dodge the bubbles • Grab the gems</p>';
+    c.innerHTML = '<h1 id="title" style="font-size:min(11vw,13vh);line-height:1.25;animation:none">BLIP<br>PANIC!</h1>';
     document.body.appendChild(c);
   }
 }

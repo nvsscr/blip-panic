@@ -25,4 +25,14 @@ for pat in (r'<meta charset[^>]*>\s*', r'<meta name="viewport"[^>]*>\s*', r'<met
 head = head.replace(":root {", ":root { color-scheme: dark;", 1)
 (dist / "blip-panic-play.html").write_text(head.strip() + "\n" + body.strip() + "\n", encoding="utf-8")
 
+# CrazyGames: same game plus their SDK (ads, gameplay events). Only this copy loads it,
+# because the SDK blocks the game on any site that isn't CrazyGames.
+SDK_TAG = '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>\n'
+cg = src.replace("</head>", SDK_TAG + "</head>", 1)
+cg_dir = dist / "crazygames"
+cg_dir.mkdir(exist_ok=True)
+(cg_dir / "index.html").write_text(cg, encoding="utf-8")
+with zipfile.ZipFile(dist / "blip-panic-crazygames.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("index.html", cg)
+
 print("built", *(p.name for p in dist.iterdir()))

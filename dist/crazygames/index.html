@@ -1,0 +1,1297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#165f80">
+<title>Blip Panic</title>
+<meta name="description" content="Dodge the bubbles, grab the gems. A fast arcade dodge game for mouse, touch, keyboard and controller.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2300e5ff' opacity='.5'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23fff' stroke='%2300e5ff' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Ported from the Roblox version (Config.Theme). Layout: canvas = background + arena; DOM = menu, HUD, cards. */
+  :root {
+    color-scheme: dark;
+    --ink: #061420; --panel: rgba(8,26,44,.88); --panelLine: rgba(255,255,255,.15);
+    --white: #ffffff; --yellow: #ffd60a; --orange: #ff8020; --pink: #ff4070; --cyan: #00e5ff;
+    --green: #6ef05a; --muted: #96c4ce; --play: #6eeb46; --playBase: #428c2a; --sec: #224268; --secBase: #14283e;
+    --title: "Press Start 2P", ui-monospace, monospace;
+    --body: "Ubuntu", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #165f80; color: var(--white);
+    font-family: var(--body); user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+  body.playing.mouse { cursor: crosshair; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .layer { position: fixed; inset: 0; pointer-events: none;
+    padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .layer * { pointer-events: auto; }
+  .hidden { display: none !important; }
+  .panel { background: var(--panel); border: 1px solid var(--panelLine); border-radius: 16px; }
+  .ink { text-shadow: 3px 0 var(--ink), -3px 0 var(--ink), 0 3px var(--ink), 0 -3px var(--ink), 3px 3px var(--ink), -3px -3px var(--ink), 3px -3px var(--ink), -3px 3px var(--ink); }
+  .pix { image-rendering: pixelated; display: inline-block; vertical-align: middle; }
+
+  /* Chunky arcade button: coloured face over a darker base it presses into. */
+  .btn { position: relative; border: 0; padding: 0; background: none; cursor: pointer; font-family: var(--title); color: var(--ink);
+    --face: var(--play); --base: var(--playBase); transition: transform .1s ease-out; }
+  .btn::before { content: ""; position: absolute; inset: 5px 0 -5px 0; background: var(--base); border-radius: 18px; }
+  .btn > span { position: relative; display: flex; align-items: center; justify-content: center; gap: .5em; height: 100%;
+    background: var(--face); border-radius: 18px; padding: 0 1em; transition: filter .1s, transform .06s; }
+  .btn:hover, .btn.focus { transform: scale(1.04); }
+  .btn:hover > span, .btn.focus > span { filter: brightness(1.15); }
+  .btn:active > span { transform: translateY(4px); }
+  .btn:active { transform: scale(.96); }
+  .btn.sec { --face: var(--sec); --base: var(--secBase); color: var(--white); }
+  .btn.gold { --face: var(--yellow); --base: #9a8106; }
+  .btn.focus::after { content: ""; position: absolute; inset: -7px -7px -12px -7px; border: 4px solid #fff; border-radius: 24px; }
+
+  /* MENU */
+  #menu { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto;
+    column-gap: 3vmin; row-gap: 1.6vmin; align-content: center; max-width: 1200px; margin: 0 auto; padding-top: max(3vh, env(safe-area-inset-top)); }
+  #title { grid-column: 1 / -1; text-align: center; font-family: var(--title); font-size: min(7.2vw, 11vh); line-height: 1; margin: 0;
+    background: linear-gradient(180deg, #00ebff, #96ff46); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(4px 0 var(--ink)) drop-shadow(-4px 0 var(--ink)) drop-shadow(0 4px var(--ink)) drop-shadow(0 -4px var(--ink));
+    animation: breathe 1.4s ease-in-out infinite alternate; }
+  @keyframes breathe { to { transform: scale(1.03); } }
+  #subtitle { grid-column: 1 / -1; text-align: center; font-size: min(3vw, 4.6vh); font-weight: 500; margin: 0 0 1vh; }
+  #subtitle, .hint { text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink); }
+  .left { display: flex; flex-direction: column; align-items: center; gap: 2.2vh; min-width: 0; }
+  .ladderHead { font-family: var(--title); color: var(--muted); font-size: min(1.9vw, 3.2vh); letter-spacing: .25em; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4vw; width: 100%; }
+  .tile { position: relative; text-align: center; padding: 2.6vh 6px 1.8vh; border-radius: 14px; }
+  .tile .bar { position: absolute; top: -3px; left: 25%; right: 25%; height: 6px; border-radius: 3px; }
+  .tile canvas { width: min(6vw, 10vh); height: min(6vw, 10vh); }
+  .tile b { display: block; font-family: var(--title); font-size: min(1.5vw, 2.6vh); margin: 1.4vh 0 .8vh; }
+  .tile p { margin: 0 0 1.4vh; font-size: min(1.35vw, 2.4vh); }
+  .tile i { font-style: normal; font-family: var(--title); font-size: min(1.1vw, 2vh); color: var(--yellow); }
+  .actions { display: flex; gap: 2vw; align-items: center; width: 100%; justify-content: center; }
+  #playBtn { width: 52%; height: min(13vh, 8.5vw); font-size: min(4vw, 6.5vh); }
+  #skinsBtn { width: 25%; height: min(13vh, 8.5vw); font-size: min(1.8vw, 3vh); }
+  .board { display: flex; flex-direction: column; padding: 2.2vh 1.6vw; min-height: 0; }
+  .board h2 { margin: 0; display: flex; align-items: center; justify-content: center; gap: .8em; font-family: var(--title); color: var(--yellow); font-size: min(1.6vw, 2.8vh); }
+  .board .bestLine { text-align: center; font-size: min(1.8vw, 3vh); margin: 1.2vh 0; }
+  .board .bestLine b { color: var(--yellow); font-family: var(--title); font-size: .85em; }
+  .board hr { border: 0; border-top: 1px solid var(--panelLine); width: 100%; margin: 0 0 1vh; }
+  .board ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; }
+  .board li { display: flex; gap: .8em; padding: .55vh .6em; border-radius: 8px; font-size: min(1.5vw, 2.6vh); }
+  .board li:nth-child(odd) { background: rgba(255,255,255,.04); }
+  .board li .r { font-family: var(--title); font-size: .75em; width: 2.2em; align-self: center; }
+  .board li:nth-child(-n+3) .r, .board li:nth-child(-n+3) .s { color: var(--yellow); }
+  .board li .lv { flex: 1; color: var(--muted); }
+  .board li .s { font-family: var(--title); font-size: .8em; align-self: center; }
+  .board .empty { flex: 1; display: grid; place-items: center; color: var(--muted); font-size: min(1.6vw, 2.8vh); text-align: center; }
+  .board .foot { text-align: center; color: var(--muted); font-size: min(1.1vw, 2vh); margin-top: 1vh; }
+  .hint { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: min(1.7vw, 3vh); }
+  #muteMenu { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 62px; height: 56px; }
+  #deviceMenu { position: fixed; left: calc(max(14px, env(safe-area-inset-left)) + 76px); bottom: max(14px, env(safe-area-inset-bottom)); height: 56px; font-size: 12px; }
+  #device { display: grid; place-items: center; background: rgba(6,20,32,.55); z-index: 30; }
+  .pick { padding: 26px 30px 30px; text-align: center; width: min(640px, 100%); }
+  .pick h2 { font-family: var(--title); color: var(--cyan); font-size: min(26px, 5vw); margin: 0 0 8px; }
+  .pick p { color: var(--muted); margin: 0 0 22px; font-size: 17px; }
+  .pickRow { display: flex; gap: 18px; }
+  .pickRow .btn { flex: 1; height: 170px; }
+  .pickRow .btn > span { flex-direction: column; gap: 12px; font-size: min(17px, 2.6vw); white-space: nowrap; }
+  .pickRow small { font-family: var(--body); font-size: 15px; font-weight: 500; opacity: .85; }
+  .pickRow svg { width: 52px; height: 52px; }
+
+  /* HUD */
+  #hud { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
+  .hudMain { display: flex; align-items: center; height: 62px; padding: 0 16px; gap: 16px; }
+  .hudMain .sep { width: 1px; align-self: stretch; margin: 12px 0; background: var(--panelLine); }
+  .lvChip { display: flex; flex-direction: column; gap: 6px; }
+  .lvChip .row { display: flex; align-items: center; gap: 6px; font-family: var(--title); font-size: 12px; }
+  .lvChip .track { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .lvChip .fill { height: 100%; width: 0; border-radius: 2px; }
+  #hudScore { font-family: var(--title); color: var(--yellow); font-size: 26px; min-width: 4.2em; text-align: center; }
+  .gems { display: flex; align-items: center; gap: 8px; font-family: var(--title); font-size: 16px; }
+  #hudTime { height: 62px; display: grid; place-items: center; padding: 0 16px; font-family: var(--title); color: var(--cyan); font-size: 16px; min-width: 104px; }
+  #hud .btn { height: 62px; }
+  #hudMute { width: 62px; } #hudMenu { font-size: 16px; padding: 0 2px; }
+  .flash { animation: flash .5s; } @keyframes flash { 30% { filter: brightness(1.8); transform: scale(1.06); } }
+
+  /* GAME OVER (centred on the arena by JS) */
+  #over { position: fixed; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .card { width: min(410px, 92%); padding: 22px 22px 26px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; pointer-events: auto; }
+  #overTitle { font-family: var(--title); font-size: 30px; margin: 0; background: linear-gradient(180deg, #ff9a3c, #ff5d6c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(3px 0 var(--ink)) drop-shadow(-3px 0 var(--ink)) drop-shadow(0 3px var(--ink)) drop-shadow(0 -3px var(--ink)); }
+  #overScore { font-family: var(--title); font-size: 46px; }
+  #overBest { font-family: var(--title); font-size: 12px; padding: 8px 18px; border-radius: 99px; background: var(--pink); }
+  #overBest.plain { background: none; color: var(--muted); font-family: var(--body); font-size: 16px; padding: 0; }
+  #overStats { font-size: 17px; display: flex; align-items: center; gap: 6px; }
+  #continueWrap { width: 88%; display: flex; flex-direction: column; gap: 10px; }
+  .contBtns { display: flex; gap: 10px; }
+  #continueBtn, #continueAdBtn { height: 56px; font-size: 13px; flex: 1; }
+  .btn.cyan { --face: var(--cyan); --base: #00808f; }
+  .contBtns .btn > span { white-space: nowrap; padding: 0 .5em; font-size: 11px; gap: .35em; }
+  #adBlock { position: fixed; inset: 0; z-index: 40; background: rgba(6,20,32,.35); }
+  .timerBar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .timerBar i { display: block; height: 100%; background: var(--yellow); width: 100%; }
+  .overBtns { display: flex; gap: 14px; margin-top: 6px; }
+  #againBtn { height: 62px; font-size: 16px; padding: 0 6px; }
+  #overMenuBtn { height: 62px; font-size: 16px; padding: 0 2px; }
+  #overHint { color: var(--muted); font-size: 16px; text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink); pointer-events: none; }
+
+  /* SKINS */
+  #skins { display: grid; place-items: center; background: rgba(6,20,32,.45); }
+  .shop { width: min(880px, 100%); max-height: 100%; overflow: auto; padding: 22px 28px 26px; }
+  .shopHead { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .shopHead h2 { flex: 1; margin: 0; font-family: var(--title); color: var(--cyan); font-size: 26px; }
+  .shopHead .gems { color: var(--yellow); }
+  #skinsClose { width: 64px; height: 56px; font-size: 20px; }
+  .shop h3 { font-family: var(--title); color: var(--muted); font-size: 13px; margin: 16px 0 10px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+  .item { position: relative; background: rgba(255,255,255,.04); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; border: 2px solid transparent; }
+  .item:hover, .item.focus { border-color: rgba(255,255,255,.5); }
+  .item canvas { width: 100%; aspect-ratio: 120 / 84; border-radius: 8px; background: #08182a; }
+  .item .nm { font-size: 17px; }
+  .item .tag { font-family: var(--title); font-size: 11px; padding: 8px 4px; border-radius: 8px; width: 100%; text-align: center; color: var(--ink); background: var(--yellow); }
+  .item .tag.on { background: #0b2033; color: var(--green); }
+  .item .tag.own { background: var(--sec); color: var(--white); }
+  .item .feat { position: absolute; top: 4px; right: 4px; font-family: var(--title); font-size: 8px; background: var(--pink); color: #fff; padding: 4px 6px; border-radius: 6px; }
+
+  #toast { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--panel);
+    border: 1px solid var(--panelLine); border-radius: 12px; padding: 10px 16px; font-size: 16px; display: flex; gap: 8px; align-items: center; opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+  #rotate { position: fixed; inset: 0; z-index: 50; display: none; background: #165f80; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; font-family: var(--title); font-size: 14px; text-align: center; line-height: 1.7; padding: 24px; }
+
+  /* Phones (short landscape screens) */
+  @media (max-height: 500px) {
+    #menu { row-gap: 1vh; padding-top: max(1.5vh, env(safe-area-inset-top)); }
+    #muteMenu { width: 48px; height: 44px; }
+    #deviceMenu { height: 44px; left: calc(max(14px, env(safe-area-inset-left)) + 58px); font-size: 10px; }
+    .pick { padding: 14px 18px 18px; } .pick p { margin-bottom: 12px; font-size: 14px; }
+    .pickRow .btn { height: 120px; } .pickRow svg { width: 36px; height: 36px; }
+    .hudMain { height: 46px; gap: 10px; padding: 0 10px; }
+    .lvChip .row { font-size: 9px; } #hudScore { font-size: 17px; } .gems { font-size: 12px; }
+    #hudTime { height: 46px; font-size: 11px; min-width: 74px; padding: 0 8px; }
+    #hud .btn { height: 46px; } #hudMute { width: 48px; } #hudMenu { font-size: 11px; }
+    .card { padding: 12px 16px 16px; gap: 7px; }
+    #overTitle { font-size: 20px; } #overScore { font-size: 30px; } #overStats { font-size: 14px; }
+    #againBtn, #overMenuBtn { height: 48px; font-size: 12px; } #continueBtn, #continueAdBtn { height: 44px; font-size: 10px; }
+    #overHint { display: none; }
+    .shop { padding: 12px 16px; } .shop h3 { margin: 8px 0 6px; } .items { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  }
+  @media (pointer: coarse) and (orientation: portrait) { #rotate { display: flex; } }
+  @media (prefers-reduced-motion: reduce) { #title { animation: none; } }
+</style>
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="menu" class="layer">
+  <h1 id="title">BLIP PANIC!</h1>
+  <p id="subtitle">Dodge the bubbles &nbsp;•&nbsp; Grab the gems <canvas class="pix" data-icon="Star" style="height:1em"></canvas></p>
+  <div class="left">
+    <div class="ladderHead">SURVIVE TO LEVEL UP</div>
+    <div class="tiles" id="tiles"></div>
+    <div class="actions">
+      <button class="btn" id="playBtn" data-nav><span>PLAY!</span></button>
+      <button class="btn sec" id="skinsBtn" data-nav><span>SKINS</span></button>
+    </div>
+  </div>
+  <div class="board panel">
+    <h2><canvas class="pix" data-icon="Trophy" style="height:1.4em"></canvas>YOUR TOP 10</h2>
+    <div class="bestLine">YOUR BEST&nbsp; <b id="bestNum">0</b></div>
+    <hr>
+    <ol id="boardList"></ol>
+    <div class="foot">Saved on this device</div>
+  </div>
+  <div class="hint" id="menuHint">Steer with your mouse • grab 💎, dodge the rest</div>
+  <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
+  <button class="btn sec" id="deviceMenu" data-nav><span id="deviceLabel">PC</span></button>
+</div>
+
+<div id="hud" class="layer hidden">
+  <div class="hudMain panel" id="hudMain">
+    <div class="lvChip"><div class="row"><canvas class="pix" id="hudStage" style="height:18px"></canvas><span id="hudLevel">LV 1</span></div><div class="track"><div class="fill" id="hudFill"></div></div></div>
+    <div class="sep"></div>
+    <div id="hudScore">0</div>
+    <div class="sep"></div>
+    <div class="gems"><canvas class="pix" data-icon="Star" style="height:22px"></canvas><span id="hudGems">0</span></div>
+  </div>
+  <div id="hudTime" class="panel">0.0s</div>
+  <button class="btn sec" id="hudMute" aria-label="Sound"><span><canvas class="pix" data-sound style="height:22px"></canvas></span></button>
+  <button class="btn sec" id="hudMenu"><span>MENU</span></button>
+</div>
+
+<div id="over" class="hidden">
+  <div class="card panel">
+    <h2 id="overTitle">SPLAT!</h2>
+    <div id="overScore">0</div>
+    <div id="overBest"></div>
+    <div id="overStats"></div>
+    <div id="continueWrap">
+      <div class="contBtns">
+        <button class="btn gold" id="continueBtn" data-nav><span>CONTINUE · <canvas class="pix" data-icon="Star" style="height:16px"></canvas> <b id="continueCost">15</b></span></button>
+        <button class="btn cyan hidden" id="continueAdBtn" data-nav><span>▶ FREE CONTINUE</span></button>
+      </div>
+      <div class="timerBar"><i id="continueBar"></i></div>
+    </div>
+    <div class="overBtns">
+      <button class="btn" id="againBtn" data-nav><span>PLAY AGAIN</span></button>
+      <button class="btn sec" id="overMenuBtn" data-nav><span>MENU</span></button>
+    </div>
+  </div>
+  <div id="overHint">Space = play again</div>
+</div>
+
+<div id="skins" class="layer hidden">
+  <div class="shop panel">
+    <div class="shopHead"><h2>SKINS</h2><div class="gems"><canvas class="pix" data-icon="Star" style="height:24px"></canvas><span id="shopGems">0</span></div>
+      <button class="btn sec" id="skinsClose" data-nav aria-label="Close"><span>✕</span></button></div>
+    <h3>BLIP</h3><div class="items" id="skinItems"></div>
+    <h3>ARENA</h3><div class="items" id="themeItems"></div>
+  </div>
+</div>
+
+<div id="device" class="layer hidden">
+  <div class="pick panel">
+    <h2>HOW ARE YOU PLAYING?</h2>
+    <p>Pick one. You can change it later on the menu.</p>
+    <div class="pickRow">
+      <button class="btn cyan" id="pickPhone" data-nav><span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#061420" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><circle cx="12" cy="17.5" r="1"/></svg>
+        PHONE / TABLET<small>Thumb joystick</small></span></button>
+      <button class="btn" id="pickPc" data-nav><span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#061420" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="3" width="20" height="13" rx="2"/><path d="M8 21h8M12 16v5"/></svg>
+        PC<small>Blip follows your mouse</small></span></button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="adBlock" class="hidden"></div>
+<div id="rotate"><div style="font-size:40px">⟳</div>Turn your phone sideways<br>to play</div>
+
+<script>
+"use strict";
+// =====================================================================
+// CONFIG (same numbers as the Roblox version's Config module)
+// =====================================================================
+const rgb = (r, g, b) => [r, g, b];
+const W = 1000, H = 625;
+const A = { BlipRadius: 11, HitForgiveness: 3, FollowSharpness: 30, TrailLength: 10, SmallScreenBlipScale: 1.4 };
+const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 750, SmallScreen: 500 };
+const LV = {
+  Every: 8, SpeedEase: 1.5, BannerTime: 1.4,
+  Levels: [
+    { Bubbles: 4, Speed: 190, Duration: 5 },
+    { Bubbles: 6, Speed: 210, Duration: 6 },
+    { Bubbles: 7, Speed: 225, ZoomerEvery: 5 },
+    { Bubbles: 8, Speed: 240, ZoomerEvery: 4.5 },
+    { Bubbles: 9, Speed: 255, ZoomerEvery: 4.5, Chasers: 1, ChaserEvery: 11 },
+    { Bubbles: 10, Speed: 270, ZoomerEvery: 4, Chasers: 1, ChaserEvery: 10 },
+    { Bubbles: 12, Speed: 285, ZoomerEvery: 3.5, Chasers: 2, ChaserEvery: 9 },
+    { Bubbles: 13, Speed: 300, ZoomerEvery: 3, Chasers: 2, ChaserEvery: 8 },
+    { Bubbles: 15, Speed: 320, ZoomerEvery: 2.8, Chasers: 3, ChaserEvery: 7.5 },
+    { Bubbles: 17, Speed: 340, ZoomerEvery: 2.5, Chasers: 3, ChaserEvery: 7 },
+  ],
+  AfterLast: { Bubbles: 1, MaxBubbles: 26, Speed: 15, MaxSpeed: 480, ZoomerEvery: -0.15, MinZoomerEvery: 1.6, ChaserEvery: -0.5, MinChaserEvery: 5, MaxChasers: 4 },
+  Stages: [
+    { From: 1, Icon: "Chill", Title: "WARM-UP", Note: "Bubbles bounce around", Color: rgb(0, 205, 190) },
+    { From: 3, Icon: "Spicy", Title: "ZOOMERS", Note: "Fast ones zip across", Color: rgb(255, 128, 32) },
+    { From: 5, Icon: "Insane", Title: "CHASERS", Note: "They hunt you down", Color: rgb(240, 50, 120) },
+  ],
+};
+const durationOf = n => (LV.Levels[n - 1] && LV.Levels[n - 1].Duration) || LV.Every;
+const startOf = n => { let t = 0; for (let i = 1; i < n; i++) t += durationOf(i); return t; };
+const E = {
+  WarningTime: 0.75, BubbleCollisions: true,
+  CornerHeat: { Zone: 80, Glow: 2.0, Warn: 2.5, Red: 3.5, Strike: 4.0, AfterStrike: 2.0, DrainTime: 1.0 },
+  BumpCooldown: 0.12, SafeSpawnDistance: 220,
+  Bubble: { MinRadius: 16, MaxRadius: 34 },
+  Zoomer: { Radius: 13, SpeedMultiplier: 2.4, Aim: 0.85, AimSpread: 0.3 },
+  Chaser: { Radius: 21, SpeedMultiplier: 0.42, Turn: 2.2, Lifetime: 11 },
+  Colors: [rgb(0, 200, 255), rgb(255, 64, 112), rgb(255, 214, 10), rgb(160, 100, 255), rgb(90, 160, 255)],
+  ZoomerColor: rgb(255, 128, 32), ChaserColor: rgb(120, 245, 90),
+};
+const ST = { Every: 4, Lifetime: 6, Radius: 16, Points: 50, FirstAfter: 2 };
+const PointsPerSecond = 10;
+const REVIVE = { Cost: 15, Window: 5, ClearRadius: 140, PushRadius: 240, PushDistance: 80, ShieldTime: 2, RecoverTime: 5, StartSpeed: 0.75 };
+const THEME = { Ink: rgb(6, 20, 32), White: rgb(255, 255, 255), Yellow: rgb(255, 214, 10), Cyan: rgb(0, 229, 255), Muted: rgb(150, 196, 206) };
+const SKINS = [
+  { Id: "Classic", Name: "Classic", Core: rgb(255, 255, 255), Glow: rgb(0, 229, 255), Trail: [rgb(120, 240, 255), rgb(0, 180, 255)], Burst: [rgb(120, 240, 255), rgb(255, 255, 255)] },
+  { Id: "Ice", Name: "Ice", Gems: 25, Core: rgb(240, 252, 255), Glow: rgb(150, 220, 255), Trail: [rgb(220, 248, 255), rgb(140, 200, 255)], Burst: [rgb(255, 255, 255), rgb(170, 230, 255), rgb(110, 180, 255)] },
+  { Id: "Fire", Name: "Fire", Gems: 50, Core: rgb(255, 245, 190), Glow: rgb(255, 120, 30), Trail: [rgb(255, 200, 60), rgb(255, 60, 30)], Burst: [rgb(255, 220, 80), rgb(255, 120, 30), rgb(230, 40, 30)] },
+  { Id: "Glitch", Name: "Glitch", Gems: 100, Core: rgb(255, 255, 255), Glow: rgb(255, 0, 200), Trail: [rgb(0, 255, 240), rgb(255, 0, 200)], Alternate: true, Burst: [rgb(0, 255, 240), rgb(255, 0, 200), rgb(160, 255, 60)] },
+  { Id: "Rainbow", Name: "Rainbow", Gems: 150, Featured: true, Core: rgb(255, 255, 255), Glow: rgb(255, 120, 200), Trail: [rgb(255, 80, 80), rgb(80, 160, 255)], Rainbow: true, Burst: [rgb(255, 80, 80), rgb(255, 200, 60), rgb(90, 230, 110), rgb(80, 160, 255), rgb(190, 110, 255)] },
+];
+const THEMES = [
+  { Id: "Ocean", Name: "Ocean", Top: rgb(28, 120, 150), Bottom: rgb(16, 58, 96), Floor: rgb(8, 24, 42), Grid: rgb(0, 229, 255) },
+  { Id: "DeepSpace", Name: "Deep Space", Gems: 50, Top: rgb(34, 22, 78), Bottom: rgb(6, 6, 24), Floor: rgb(5, 5, 18), Grid: rgb(170, 150, 255) },
+  { Id: "NeonCity", Name: "Neon City", Gems: 150, Top: rgb(110, 20, 120), Bottom: rgb(18, 10, 50), Floor: rgb(14, 6, 30), Grid: rgb(255, 60, 200) },
+];
+const OUCH = ["POP!", "OUCH!", "BONK!", "SPLAT!", "WHOOPS!", "YIKES!"];
+
+// pixel-art icons (Config.Icons)
+const monster = { Rows: [".D......D.", ".DD....DD.", "..DPPPPD..", ".DPPPPPPD.", "DPWWPPWWPD", "DPWKPPWKPD", "DPPPPPPPPD", "DPPKWWKPPD", ".DPPPPPPD.", "..DD..DD.."],
+  Palette: { D: rgb(150, 15, 60), P: rgb(255, 64, 112), W: rgb(255, 255, 255), K: rgb(6, 20, 32) } };
+const speakerBody = ["....W......", "...WW......", "WWWWW......", "WWWWW......", "WWWWW......", "WWWWW......", "...WW......", "....W......"];
+const speaker = (extra, pal) => ({ Rows: speakerBody.map((r, i) => r.slice(0, 5) + extra[i]), Palette: pal });
+const ICONS = {
+  Chill: { Rows: ["...XXXX...", ".XXCCCCXX.", ".XLLCCCCX.", "XLWLCCCCCX", "XLLCCCCCCX", "XCCCCCCCCX", "XCCCCCCCCX", ".XCCCCCCX.", ".XXCCCCXX.", "...XXXX..."],
+    Palette: { X: rgb(0, 110, 130), C: rgb(0, 205, 190), L: rgb(130, 245, 235), W: rgb(255, 255, 255) } },
+  Spicy: { Rows: [".......XXX..", "LLL...XLWOX.", ".....XLWOOOX", "LLLL.XOOOOOX", ".....XOOOOOX", "LLL...XOOOX.", ".......XXX.."],
+    Palette: { X: rgb(150, 60, 0), O: rgb(255, 128, 32), L: rgb(255, 200, 140), W: rgb(255, 255, 255) } },
+  Insane: monster, Chaser: monster,
+  Star: { Rows: ["..XXXXXXX..", ".XLLWCCCDX.", "XLLWCCCCDDX", "XDDDDDDDDDX", ".XCCCCCCDX.", "..XCCCCDX..", "...XCCDX...", "....XCX....", ".....X....."],
+    Palette: { X: rgb(0, 70, 120), C: rgb(0, 229, 255), L: rgb(170, 250, 255), W: rgb(255, 255, 255), D: rgb(0, 150, 210) } },
+  Trophy: { Rows: ["Y....Y....Y", "YY..YYY..YY", "YYY.YYY.YYY", "YYYYYYYYYYY", "YYPYYCYYPYY", "YYYYYYYYYYY", "DDDDDDDDDDD"],
+    Palette: { Y: rgb(255, 214, 10), D: rgb(200, 130, 0), P: rgb(255, 64, 112), C: rgb(0, 229, 255) } },
+  SoundOn: speaker(["......", "....C.", "..C..C", ".C.C.C", ".C.C.C", "..C..C", "....C.", "......"], { W: rgb(255, 255, 255), C: rgb(0, 229, 255) }),
+  SoundOff: speaker(["......", ".R...R", "..R.R.", "...R..", "..R.R.", ".R...R", "......", "......"], { W: rgb(255, 255, 255), R: rgb(255, 64, 112) }),
+};
+
+// =====================================================================
+// helpers
+// =====================================================================
+const $ = id => document.getElementById(id);
+const css = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const lerpC = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t].map(Math.round);
+const hsv = (h, s, v) => { const i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i % 6]; return [r * 255, g * 255, b * 255].map(Math.round); };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const len = (x, y) => Math.hypot(x, y);
+const iconCanvas = {};
+function iconSprite(key) {
+  if (iconCanvas[key]) return iconCanvas[key];
+  const art = ICONS[key], h = art.Rows.length, w = Math.max(...art.Rows.map(r => r.length));
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+  art.Rows.forEach((row, y) => [...row].forEach((ch, x) => { const col = art.Palette[ch]; if (col) { g.fillStyle = css(col); g.fillRect(x, y, 1, 1); } }));
+  return (iconCanvas[key] = c);
+}
+function paintIcon(el, key) { const s = iconSprite(key); el.width = s.width; el.height = s.height; el.getContext("2d").drawImage(s, 0, 0); el.style.aspectRatio = s.width + "/" + s.height; }
+document.querySelectorAll("canvas[data-icon]").forEach(c => paintIcon(c, c.dataset.icon));
+const levelDef = n => {
+  const list = LV.Levels; if (n >= 1 && n <= list.length) return list[n - 1];
+  if (n < 1) return {};
+  const b = list[list.length - 1], k = n - list.length, a = LV.AfterLast;
+  return { Bubbles: Math.min(a.MaxBubbles, b.Bubbles + a.Bubbles * k), Speed: Math.min(a.MaxSpeed, b.Speed + a.Speed * k),
+    ZoomerEvery: Math.max(a.MinZoomerEvery, b.ZoomerEvery + a.ZoomerEvery * k), Chasers: Math.min(a.MaxChasers, b.Chasers + Math.floor(k / 2)),
+    ChaserEvery: Math.max(a.MinChaserEvery, b.ChaserEvery + a.ChaserEvery * k) };
+};
+const stageFor = n => { let s = LV.Stages[0]; for (const x of LV.Stages) if (n >= x.From) s = x; return s; };
+
+// =====================================================================
+// save (this device only)
+// =====================================================================
+const SAVE_KEY = "blipPanic.v2";
+let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false, device: null };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+const skinDef = () => SKINS.find(s => s.Id === save.skin) || SKINS[0];
+const themeDef = () => THEMES.find(s => s.Id === save.theme) || THEMES[0];
+
+// =====================================================================
+// sounds (little synth versions of the Roblox sounds)
+// =====================================================================
+let actx = null;
+const silent = () => save.muted || CG.sdkMuted || CG.adPlaying;
+function tone(freq, dur, { type = "square", vol = 0.05, slide = 0, delay = 0 } = {}) {
+  if (silent()) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + delay;
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.03);
+  } catch (e) {}
+}
+function noise(dur, vol = 0.12) {
+  if (silent()) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const n = actx.sampleRate * dur, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.value = 1400; s.buffer = buf; g.gain.value = vol;
+    s.connect(f).connect(g).connect(actx.destination); s.start();
+  } catch (e) {}
+}
+const ping = (f, vol = .05) => { tone(f, 0.16, { type: "sine", vol: vol * 1.6 }); tone(f * 2, 0.08, { type: "triangle", vol: vol * .5 }); };
+const SFX = {
+  Click: () => tone(520, 0.04, { vol: 0.035 }),
+  Start: () => ping(560),
+  Star: () => { ping(1250, .06); tone(1870, .1, { type: "sine", vol: .05, delay: .06 }); },
+  Pop: () => { noise(0.28, 0.2); tone(300, 0.3, { type: "sawtooth", vol: 0.05, slide: -220 }); },
+  NewBest: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, { type: "square", vol: 0.04, delay: i * 0.09 })),
+  Warn: (p = 1) => tone(1400 * p, 0.035, { vol: 0.025 }),
+  LevelUp: () => { ping(800); tone(1200, .12, { type: "sine", vol: .05, delay: .08 }); },
+  Bump: p => tone(1500 * p, 0.025, { type: "triangle", vol: 0.03 }),
+  Revive: () => { ping(380, .07); tone(760, .25, { type: "sine", vol: .05, delay: .1 }); },
+};
+
+// =====================================================================
+// screen / layout
+// =====================================================================
+const cv = $("game"), ctx = cv.getContext("2d");
+let vw = 0, vh = 0, dpr = 1, ax = 0, ay = 0, as = 1; // arena -> screen: x*as + ax
+let small = false;
+function layout() {
+  dpr = DEMO ? 1 : Math.min(window.devicePixelRatio || 1, 2); // trailers record at exactly 1080p
+  vw = window.innerWidth; vh = window.innerHeight; small = vh < IN.SmallScreen;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  let top = 12;
+  if (state !== "menu") { const r = $("hudMain").getBoundingClientRect(); if (r.height) top = r.bottom + (small ? 8 : 16); }
+  const pad = small ? 8 : 18, availW = vw - pad * 2, availH = vh - top - pad;
+  as = Math.min(availW / W, availH / H); ax = (vw - W * as) / 2; ay = top + (availH - H * as) / 2;
+  if (state === "menu") { as = Math.min(vw / W, vh / H) * 0.9; ax = (vw - W * as) / 2; ay = (vh - H * as) / 2; }
+  joy.fit();
+  const o = $("over").style; o.left = ax + "px"; o.top = ay + "px"; o.width = W * as + "px"; o.height = H * as + "px";
+}
+
+// background rings drifting up (behind everything)
+const rings = Array.from({ length: 10 }, (_, i) => ({ x: rnd(.02, .98), s: rnd(.02, .05), d: rnd(16, 32), off: rnd(0, 1), col: lerpC(E.Colors[i % 5], [255, 255, 255], .4), dx: rnd(-.05, .05) }));
+
+// =====================================================================
+// game state
+// =====================================================================
+// =====================================================================
+// CrazyGames SDK. The script tag is only added to the CrazyGames build (build.py);
+// everywhere else window.CrazyGames is missing and all of this does nothing.
+// =====================================================================
+const CG = {
+  ready: false, sdk: null, sdkMuted: false, adPlaying: false, playing: false,
+  async init() {
+    try {
+      const s = window.CrazyGames && window.CrazyGames.SDK; if (!s) return;
+      await s.init();
+      if (s.environment === "disabled") return;
+      this.sdk = s; this.ready = true;
+      this.sdkMuted = !!(s.game.settings && s.game.settings.muteAudio);
+      s.game.addSettingsChangeListener(n => { this.sdkMuted = !!n.muteAudio; });
+    } catch (e) { this.ready = false; }
+  },
+  call(fn) { if (!this.ready) return; try { fn(this.sdk); } catch (e) {} },
+  // gameplayStart / gameplayStop only when real play starts or stops (not on tab switches)
+  setPlaying(on) { if (on === this.playing) return; this.playing = on; this.call(s => on ? s.game.gameplayStart() : s.game.gameplayStop()); },
+  happytime() { this.call(s => s.game.happytime()); },
+  // resolves true only when the ad really finished (rewarded = give the reward)
+  ad(type) {
+    return new Promise(done => {
+      if (!this.ready) return done(false);
+      $("adBlock").classList.remove("hidden");
+      const end = ok => { this.adPlaying = false; $("adBlock").classList.add("hidden"); done(ok); };
+      try {
+        this.sdk.ad.requestAd(type, { adStarted: () => { this.adPlaying = true; }, adFinished: () => end(true), adError: () => end(false) });
+      } catch (e) { end(false); }
+    });
+  },
+};
+let DEMO = false; // trailer recording mode (#video): the blip steers itself and can't be hit
+let userPaused = false; // paused with Esc / P / Start (a tab switch also pauses, but that is not a gameplay stop)
+
+let state = "menu"; // menu | playing | over
+let paused = false, inputMode = matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
+const G = {}; // the run
+let effects = []; // bursts, float text
+let shakeT = -1, clock = 0;
+const SHAKE = [[12, -6], [-10, 8], [8, 6], [-6, -4], [3, 2], [0, 0]];
+
+function resetRun() {
+  Object.assign(G, { ents: [], star: null, time: 0, stars: 0, level: 0, def: levelDef(1), speed: levelDef(1).Speed, targetSpeed: levelDef(1).Speed,
+    revived: false, reviveAt: null, shieldUntil: null, calmUntil: null, heat: 0, heatCorner: null, dead: false, running: false,
+    blip: { x: W / 2, y: H / 2 }, hist: [], nextZoomer: Infinity, nextChaser: Infinity, nextStar: ST.FirstAfter, nextLevel: 0,
+    spawnQueue: [], lastBumpSound: -1, banner: null, entry: null });
+  G.hist = Array(A.TrailLength).fill(0).map(() => ({ x: W / 2, y: H / 2 }));
+  padTarget = { x: W / 2, y: H / 2 }; mouseTarget = null; effects = [];
+}
+function begin() { G.running = true; G.time = 0; G.level = 0; levelUp(); }
+function score() { return Math.floor(G.time * PointsPerSecond) + G.stars * ST.Points; }
+function levelUp() {
+  G.level++;
+  const def = levelDef(G.level); G.def = def; G.nextLevel = startOf(G.level + 1); G.targetSpeed = def.Speed;
+  const need = def.Bubbles - count("Bubble");
+  for (let i = 0; i < need; i++) G.spawnQueue.push(G.time + i * 0.15);
+  if (def.ZoomerEvery && G.nextZoomer === Infinity) G.nextZoomer = G.time + 1;
+  if ((def.Chasers || 0) > 0 && G.nextChaser === Infinity) G.nextChaser = G.time + 1.5;
+  onLevel(G.level, def);
+}
+const count = kind => G.ents.filter(e => e.kind === kind).length;
+function curSpeed() {
+  if (G.calmUntil && G.time < G.calmUntil) {
+    const t = G.time - G.reviveAt, ramp = clamp((t - REVIVE.ShieldTime) / Math.max(.01, REVIVE.RecoverTime - REVIVE.ShieldTime), 0, 1);
+    return G.speed * (REVIVE.StartSpeed + (1 - REVIVE.StartSpeed) * ramp);
+  }
+  return G.speed;
+}
+const shielded = () => G.shieldUntil != null && G.time < G.shieldUntil;
+function safePoint(r, minD) {
+  let best = null, bd = -1;
+  for (let i = 0; i < 12; i++) { const p = { x: rnd(r, W - r), y: rnd(r, H - r) }, d = len(p.x - G.blip.x, p.y - G.blip.y);
+    if (d >= minD) return p; if (d > bd) { best = p; bd = d; } }
+  return best;
+}
+function addWarned(kind, pos, r, color, init) { const e = { kind, x: pos.x, y: pos.y, r, color, warn: E.WarningTime, born: G.time, init }; G.ents.push(e); return e; }
+function goLive(e) { e.warn = null; e.init(e); }
+function spawnBubble() {
+  const r = rnd(E.Bubble.MinRadius, E.Bubble.MaxRadius), p = safePoint(r, E.SafeSpawnDistance);
+  addWarned("Bubble", p, r, E.Colors[rndInt(0, 4)], e => { const a = rnd(0, Math.PI * 2); e.dx = Math.cos(a); e.dy = Math.sin(a); e.sf = rnd(0.8, 1.2); });
+}
+function spawnZoomer() {
+  const r = E.Zoomer.Radius, side = rndInt(1, 4); let p, d;
+  if (side === 1) { p = { x: r, y: rnd(r, H - r) }; d = { x: 1, y: rnd(-.3, .3) }; }
+  else if (side === 2) { p = { x: W - r, y: rnd(r, H - r) }; d = { x: -1, y: rnd(-.3, .3) }; }
+  else if (side === 3) { p = { x: rnd(r, W - r), y: r }; d = { x: rnd(-.3, .3), y: 1 }; }
+  else { p = { x: rnd(r, W - r), y: H - r }; d = { x: rnd(-.3, .3), y: -1 }; }
+  if (len(p.x - G.blip.x, p.y - G.blip.y) < E.SafeSpawnDistance * 0.6) return;
+  addWarned("Zoomer", p, r, E.ZoomerColor, e => {
+    const m = len(d.x, d.y); let dx = d.x / m, dy = d.y / m;
+    const tx = G.blip.x - e.x, ty = G.blip.y - e.y;
+    if (len(tx, ty) > 1 && Math.random() < E.Zoomer.Aim) { const a = Math.atan2(ty, tx) + rnd(-E.Zoomer.AimSpread, E.Zoomer.AimSpread); dx = Math.cos(a); dy = Math.sin(a); }
+    e.dx = dx; e.dy = dy;
+  });
+  SFX.Warn();
+}
+function spawnChaser() {
+  const r = E.Chaser.Radius;
+  const corners = [{ x: r, y: r }, { x: W - r, y: r }, { x: r, y: H - r }, { x: W - r, y: H - r }].sort((a, b) => len(b.x - G.blip.x, b.y - G.blip.y) - len(a.x - G.blip.x, a.y - G.blip.y));
+  addWarned("Chaser", corners[0], r, E.ChaserColor, e => { e.vx = 0; e.vy = 0; e.life = E.Chaser.Lifetime; });
+  SFX.Warn(0.8);
+}
+function spawnStar() {
+  const wallDist = p => Math.min(p.x, W - p.x, p.y, H - p.y);
+  let pos = safePoint(ST.Radius + 20, 150);
+  if (Math.random() > 0.25) for (let i = 0; i < 5; i++) { const q = safePoint(ST.Radius + 20, 150); if (wallDist(q) > wallDist(pos)) pos = q; }
+  G.star = { x: pos.x, y: pos.y, life: ST.Lifetime, born: G.time };
+}
+
+// ---- effects
+function burst(x, y, color, n, spread) {
+  for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), d = rnd(spread * .4, spread);
+    effects.push({ type: "dot", x, y, tx: x + Math.cos(a) * d, ty: y + Math.sin(a) * d, r: rnd(3, 7), color, t: 0, dur: rnd(.35, .6) }); }
+}
+const floatText = (x, y, text, color) => effects.push({ type: "text", x, y, text, color, t: 0, dur: 0.8 });
+
+// ---- revive
+function revive() {
+  G.dead = false; G.running = true; G.revived = true; G.reviveAt = G.time;
+  G.shieldUntil = G.time + REVIVE.ShieldTime; G.calmUntil = G.time + REVIVE.RecoverTime;
+  G.ents = G.ents.filter(e => {
+    const ox = e.x - G.blip.x, oy = e.y - G.blip.y, d = len(ox, oy);
+    if (d < REVIVE.ClearRadius + e.r) { burst(e.x, e.y, e.color, 6, 60); return false; }
+    if (e.kind === "Bubble" && d < REVIVE.PushRadius && d > .01) { e.x = clamp(e.x + ox / d * REVIVE.PushDistance, e.r, W - e.r); e.y = clamp(e.y + oy / d * REVIVE.PushDistance, e.r, H - e.r); }
+    return true;
+  });
+  if (G.nextZoomer !== Infinity) G.nextZoomer = Math.max(G.nextZoomer, G.calmUntil);
+  if (G.nextChaser !== Infinity) G.nextChaser = Math.max(G.nextChaser, G.calmUntil);
+  G.hist = G.hist.map(() => ({ x: G.blip.x, y: G.blip.y }));
+  burst(G.blip.x, G.blip.y, skinDef().Glow, 14, 110);
+  SFX.Revive();
+}
+
+function die(killer) {
+  G.running = false; G.dead = true;
+  SFX.Pop();
+  const cols = skinDef().Burst; for (const c of cols) burst(G.blip.x, G.blip.y, c, Math.ceil(18 / cols.length), 120);
+  burst(G.blip.x, G.blip.y, killer.color, 10, 90);
+  shakeT = 0;
+  if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) try { navigator.vibrate(100); } catch (e) {}
+  onDeath();
+}
+
+// ---- update
+function update(dt, target, instant) {
+  if (G.dead) return;
+  dt = Math.min(dt, 0.25);
+  if (target) {
+    const r = A.BlipRadius, tx = clamp(target.x, r, W - r), ty = clamp(target.y, r, H - r);
+    if (instant) { G.blip.x = tx; G.blip.y = ty; }
+    else { const a = 1 - Math.exp(-A.FollowSharpness * dt); G.blip.x += (tx - G.blip.x) * a; G.blip.y += (ty - G.blip.y) * a; }
+  }
+  G.hist.unshift({ x: G.blip.x, y: G.blip.y }); G.hist.length = A.TrailLength;
+  if (!G.running) return;
+  const steps = Math.max(1, Math.ceil(dt / (1 / 60)));
+  for (let i = 0; i < steps; i++) if (step(dt / steps)) return;
+}
+function step(dt) {
+  G.time += dt;
+  updateHeat(dt);
+  if (G.time >= G.nextLevel) levelUp();
+  while (G.spawnQueue.length && G.spawnQueue[0] <= G.time) { G.spawnQueue.shift(); spawnBubble(); }
+  const def = G.def;
+  G.speed += (G.targetSpeed - G.speed) * Math.min(1, dt * 3 / LV.SpeedEase);
+  if (G.time >= G.nextZoomer) { G.nextZoomer = def.ZoomerEvery ? G.time + def.ZoomerEvery : Infinity; spawnZoomer(); }
+  if (G.time >= G.nextChaser) { G.nextChaser = def.ChaserEvery ? G.time + def.ChaserEvery : Infinity; if (count("Chaser") < (def.Chasers || 0)) spawnChaser(); }
+  // gems
+  if (G.star) {
+    const s = G.star; s.life -= dt;
+    if (len(s.x - G.blip.x, s.y - G.blip.y) < ST.Radius + A.BlipRadius) {
+      G.stars++; SFX.Star(); burst(s.x, s.y, THEME.Cyan, 10, 70); floatText(s.x, s.y, "+" + ST.Points, THEME.Yellow); G.star = null; onStar();
+    } else if (s.life <= 0) G.star = null;
+  } else if (G.time >= G.nextStar) { G.nextStar = G.time + ST.Every; spawnStar(); }
+  // enemies
+  const speed = curSpeed(), hitR = A.BlipRadius - A.HitForgiveness;
+  for (let i = 0; i < G.ents.length; i++) {
+    const e = G.ents[i]; let remove = false;
+    if (e.warn != null) { e.warn -= dt; if (e.warn <= 0) goLive(e); continue; }
+    if (e.kind === "Bubble") {
+      let x = e.x + e.dx * speed * e.sf * dt, y = e.y + e.dy * speed * e.sf * dt;
+      if (x < e.r) { x = e.r; e.dx = Math.abs(e.dx); } else if (x > W - e.r) { x = W - e.r; e.dx = -Math.abs(e.dx); }
+      if (y < e.r) { y = e.r; e.dy = Math.abs(e.dy); } else if (y > H - e.r) { y = H - e.r; e.dy = -Math.abs(e.dy); }
+      e.x = x; e.y = y;
+    } else if (e.kind === "Zoomer") {
+      e.x += e.dx * speed * E.Zoomer.SpeedMultiplier * dt; e.y += e.dy * speed * E.Zoomer.SpeedMultiplier * dt;
+      if (e.x < -e.r || e.x > W + e.r || e.y < -e.r || e.y > H + e.r) remove = true;
+    } else if (e.kind === "Chaser") {
+      const tx = G.blip.x - e.x, ty = G.blip.y - e.y, m = len(tx, ty);
+      const dx = m > 1 ? tx / m * speed * E.Chaser.SpeedMultiplier : 0, dy = m > 1 ? ty / m * speed * E.Chaser.SpeedMultiplier : 0;
+      const k = Math.min(1, E.Chaser.Turn * dt); e.vx += (dx - e.vx) * k; e.vy += (dy - e.vy) * k;
+      e.x += e.vx * dt; e.y += e.vy * dt; e.life -= dt;
+      if (e.life <= 0) { burst(e.x, e.y, e.color, 8, 60); remove = true; }
+    }
+    if (!remove && !shielded() && !DEMO && len(e.x - G.blip.x, e.y - G.blip.y) < e.r + hitR) { die(e); return true; }
+    if (remove) { G.ents.splice(i, 1); i--; }
+  }
+  if (E.BubbleCollisions) collideBubbles();
+  return false;
+}
+
+// ---- corner heat (anti-camping)
+function cornerAt() {
+  const Z = E.CornerHeat.Zone, p = G.blip;
+  const cx = p.x < Z ? 0 : p.x > W - Z ? W : null, cy = p.y < Z ? 0 : p.y > H - Z ? H : null;
+  return cx != null && cy != null ? { x: cx, y: cy } : null;
+}
+function updateHeat(dt) {
+  const C = E.CornerHeat, c = cornerAt();
+  if (c) {
+    if (G.heatCorner && (G.heatCorner.x !== c.x || G.heatCorner.y !== c.y)) G.heat = Math.min(G.heat, C.Glow);
+    G.heatCorner = c; G.heat += dt;
+    if (G.heat >= C.Strike) { G.heat = C.AfterStrike; cornerStrike(c); }
+  } else G.heat = Math.max(0, G.heat - dt * C.Strike / C.DrainTime);
+}
+function cornerStrike(c) {
+  const r = E.Zoomer.Radius, p = { x: clamp(W - c.x, r, W - r), y: clamp(H - c.y, r, H - r) }, t = { x: clamp(c.x, 40, W - 40), y: clamp(c.y, 40, H - 40) };
+  addWarned("Zoomer", p, r, E.ZoomerColor, e => { const dx = t.x - e.x, dy = t.y - e.y, m = len(dx, dy); e.dx = dx / m; e.dy = dy / m; });
+  SFX.Warn(0.7);
+}
+
+// ---- bubble collisions (pool balls)
+function dirSpeed(vx, vy, fx, fy) { const m = len(vx, vy); if (m < 0.05) return [fx, fy, 0.8]; return [vx / m, vy / m, clamp(m, 0.7, 1.3)]; }
+function collideBubbles() {
+  const list = [], heavy = [];
+  for (const e of G.ents) if (e.warn == null) (e.kind === "Bubble" ? list : heavy).push(e);
+  const speed = Math.max(1, curSpeed());
+  for (const h of heavy) {
+    const hvx = h.kind === "Zoomer" ? h.dx * E.Zoomer.SpeedMultiplier : (h.vx || 0) / speed, hvy = h.kind === "Zoomer" ? h.dy * E.Zoomer.SpeedMultiplier : (h.vy || 0) / speed;
+    for (const b of list) {
+      const dx = b.x - h.x, dy = b.y - h.y, d = len(dx, dy), min = b.r + h.r;
+      if (d < min && d > .001) {
+        const nx = dx / d, ny = dy / d;
+        b.x = clamp(b.x + nx * (min - d), b.r, W - b.r); b.y = clamp(b.y + ny * (min - d), b.r, H - b.r);
+        let vx = b.dx * b.sf, vy = b.dy * b.sf; const ap = (vx - hvx) * nx + (vy - hvy) * ny;
+        if (ap < 0) { vx -= nx * 2 * ap; vy -= ny * 2 * ap; [b.dx, b.dy, b.sf] = dirSpeed(vx, vy, nx, ny); bump(b, h, h.x + nx * h.r, h.y + ny * h.r); }
+      }
+    }
+  }
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j], dx = b.x - a.x, dy = b.y - a.y, d = len(dx, dy), min = a.r + b.r;
+      if (d < min && d > .001) {
+        const nx = dx / d, ny = dy / d, push = (min - d) / 2;
+        a.x = clamp(a.x - nx * push, a.r, W - a.r); a.y = clamp(a.y - ny * push, a.r, H - a.r);
+        b.x = clamp(b.x + nx * push, b.r, W - b.r); b.y = clamp(b.y + ny * push, b.r, H - b.r);
+        let vax = a.dx * a.sf, vay = a.dy * a.sf, vbx = b.dx * b.sf, vby = b.dy * b.sf;
+        const ap = (vax - vbx) * nx + (vay - vby) * ny;
+        if (ap > 0) {
+          vax -= nx * ap; vay -= ny * ap; vbx += nx * ap; vby += ny * ap;
+          [a.dx, a.dy, a.sf] = dirSpeed(vax, vay, -nx, -ny); [b.dx, b.dy, b.sf] = dirSpeed(vbx, vby, nx, ny);
+          bump(a, b, a.x + nx * a.r, a.y + ny * a.r);
+        }
+      }
+    }
+  }
+}
+function bump(a, b, px, py) {
+  let fresh = false;
+  for (const e of [a, b]) if (G.time - (e.lastBump ?? -1) > E.BumpCooldown) { e.lastBump = G.time; e.squashT = 0; fresh = true; }
+  if (fresh) {
+    burst(px, py, lerpC(lerpC(a.color, b.color, .5), [255, 255, 255], .3), 5, 45);
+    if (G.time - G.lastBumpSound > 0.08) { G.lastBumpSound = G.time; SFX.Bump(0.9 + Math.random() * 0.3); }
+  }
+}
+
+// =====================================================================
+// drawing
+// =====================================================================
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0, r), 0, Math.PI * 2); }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function drawBackground() {
+  const th = themeDef();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, vh); g.addColorStop(0, css(th.Top)); g.addColorStop(1, css(th.Bottom));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+  ctx.fillStyle = css(th.Grid, .06);
+  for (let i = 1; i < 24; i++) ctx.fillRect(Math.round(vw * i / 24), 0, 1, vh);
+  for (let i = 1; i < 14; i++) ctx.fillRect(0, Math.round(vh * i / 14), vw, 1);
+  ctx.lineWidth = 2;
+  for (const r of rings) {
+    const p = ((clock / r.d) + r.off) % 1, y = vh * (1.15 - 1.3 * p), x = vw * (r.x + r.dx * p), rad = vw * r.s / 2;
+    ctx.strokeStyle = css(r.col, .4); circle(x, y, rad); ctx.stroke();
+  }
+}
+function px(v) { return v / as; } // screen pixels -> arena units
+function drawBubble(x, y, r, color, squash) {
+  const s = squash ?? 1; r *= s;
+  const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  g.addColorStop(0, css(color)); g.addColorStop(1, css(color.map(c => c * 170 / 255)));
+  ctx.fillStyle = g; circle(x, y, r); ctx.fill();
+  ctx.strokeStyle = css(lerpC(color, [255, 255, 255], .4)); ctx.lineWidth = px(2); circle(x, y, r - px(1)); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.8)"; circle(x - .36 * r, y - .42 * r, .2 * r); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.55)"; circle(x - .04 * r, y - .56 * r, .08 * r); ctx.fill();
+}
+function drawIconAt(key, x, y, size, alpha = 1) {
+  const s = iconSprite(key), k = size / Math.max(s.width, s.height);
+  ctx.imageSmoothingEnabled = false; ctx.globalAlpha *= alpha;
+  ctx.drawImage(s, x - s.width * k / 2, y - s.height * k / 2, s.width * k, s.height * k);
+  ctx.globalAlpha /= alpha;
+}
+function strokeText(text, x, y, size, color, stroke = 3) {
+  ctx.font = `${size}px "Press Start 2P", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineJoin = "round"; ctx.lineWidth = px(stroke) * 2; ctx.strokeStyle = css(THEME.Ink); ctx.strokeText(text, x, y);
+  ctx.fillStyle = typeof color === "string" ? color : css(color); ctx.fillText(text, x, y);
+}
+function drawArena() {
+  const th = themeDef();
+  let sx = 0, sy = 0;
+  if (shakeT >= 0) { const i = Math.floor(shakeT / 0.035); if (i < SHAKE.length) [sx, sy] = SHAKE[i]; else shakeT = -1; }
+  ctx.setTransform(dpr * as, 0, 0, dpr * as, dpr * (ax + sx), dpr * (ay + sy));
+  const stage = stageFor(Math.max(1, G.level || 1)), radius = px(16);
+  ctx.fillStyle = css(th.Floor); rr(0, 0, W, H, radius); ctx.fill();
+  ctx.save(); rr(0, 0, W, H, radius); ctx.clip();
+  ctx.fillStyle = css(th.Grid, .05);
+  for (let i = 1; i < 10; i++) ctx.fillRect(W * i / 10, 0, px(1), H);
+  for (let i = 1; i < 6; i++) ctx.fillRect(0, H * i / 6, W, px(1));
+
+  // corner heat glow (under everything)
+  const C = E.CornerHeat;
+  if (G.running && G.heatCorner && G.heat >= C.Glow) {
+    const red = G.heat >= C.Red; ctx.fillStyle = red ? "rgba(255,60,70,.45)" : "rgba(255,180,40,.25)";
+    circle(G.heatCorner.x, G.heatCorner.y, C.Zone * 2.2); ctx.fill();
+  }
+  // banner (under the play layer: never hides danger)
+  if (G.banner) {
+    const b = G.banner, t = clock - b.at;
+    if (t > b.dur) G.banner = null;
+    else {
+      const k = t < .3 ? backOut(t / .3) * .6 + .4 : 1;
+      ctx.save(); ctx.translate(W / 2, H / 2 - 30); ctx.scale(k, k);
+      strokeText(b.title, 0, 0, b.size, b.color, 5);
+      if (b.note) { ctx.font = `500 30px Ubuntu, sans-serif`; ctx.lineWidth = px(3) * 2; ctx.strokeStyle = css(THEME.Ink);
+        const w = ctx.measureText(b.note).width, iw = b.icon ? 40 : 0, x0 = -(w + iw) / 2;
+        if (b.icon) drawIconAt(b.icon, x0 + 16, 70, 32);
+        ctx.textAlign = "left"; ctx.strokeText(b.note, x0 + iw, 72); ctx.fillStyle = "#fff"; ctx.fillText(b.note, x0 + iw, 72); }
+      ctx.restore();
+    }
+  }
+  // gem (under the bubbles)
+  if (G.star) {
+    const s = G.star, pulse = 0.975 + 0.125 * Math.sin((G.time - s.born) * Math.PI * 2);
+    const alpha = s.life < 1.5 && Math.floor(s.life * 8) % 2 === 0 ? 0.4 : 1;
+    drawIconAt("Star", s.x, s.y, ST.Radius * 2.8 * pulse, alpha);
+  }
+  // enemies
+  for (const e of G.ents) {
+    if (e.warn != null) {
+      const p = 1 - e.warn / E.WarningTime, r = e.r * (1.6 - .6 * p * p);
+      ctx.strokeStyle = css(e.color, Math.sin(clock * Math.PI / .18) > 0 ? 1 : .2); ctx.lineWidth = px(3); circle(e.x, e.y, r - px(1.5)); ctx.stroke();
+      continue;
+    }
+    let sq = 1; if (e.squashT != null) { e.squashT += lastDt; sq = e.squashT >= .22 ? 1 : .82 + .18 * backOut(e.squashT / .22); if (e.squashT >= .22) e.squashT = null; }
+    drawBubble(e.x, e.y, e.r, e.color, sq);
+    if (e.kind === "Chaser") drawIconAt("Chaser", e.x, e.y + e.r * .04, e.r * 2 * .68);
+  }
+  // blip
+  if (!G.dead || state === "menu") drawBlip();
+  // effects
+  for (const f of effects) {
+    const k = Math.min(1, f.t / f.dur), q = 1 - (1 - k) * (1 - k);
+    if (f.type === "dot") { ctx.fillStyle = css(f.color, 1 - k); circle(f.x + (f.tx - f.x) * q, f.y + (f.ty - f.y) * q, f.r * (1 - k)); ctx.fill(); }
+    else { ctx.globalAlpha = 1 - k; strokeText(f.text, f.x, f.y - 60 * q, 34, f.color, 2); ctx.globalAlpha = 1; }
+  }
+  // MOVE! + heat bars
+  if (G.running && G.heatCorner && G.heat >= C.Warn) {
+    const red = G.heat >= C.Red, col = red ? [255, 60, 70] : [255, 180, 40], c = G.heatCorner;
+    const ix = c.x === 0 ? 1 : -1, iy = c.y === 0 ? 1 : -1, x = c.x + ix * (C.Zone + 90), y = c.y + iy * (C.Zone + 40);
+    strokeText("MOVE!", x, y, 34, col, 3);
+    const fill = (G.heat - C.Warn) / (C.Strike - C.Warn) * 3;
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = fill >= i + .01 ? css(col) : "rgb(60,60,80)"; rr(x - 56 + i * 39, y + 26, 34, 12, 4); ctx.fill(); }
+  }
+  ctx.restore();
+  // border in the stage colour
+  ctx.strokeStyle = css(stage.Color); ctx.lineWidth = px(3); rr(px(1.5), px(1.5), W - px(3), H - px(3), radius); ctx.stroke();
+}
+const backOut = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+function drawBlip() {
+  const sk = skinDef(), s = small ? A.SmallScreenBlipScale : 1, r = A.BlipRadius * s;
+  const hue0 = sk.Rainbow ? (clock * 0.6) % 1 : 0;
+  for (let i = A.TrailLength - 1; i >= 0; i--) {
+    const p = G.hist[i]; if (!p) continue; const n = i + 1;
+    let col = sk.Alternate ? (n % 2 === 0 ? sk.Trail[1] : sk.Trail[0]) : lerpC(sk.Trail[0], sk.Trail[1], i / (A.TrailLength - 1));
+    if (sk.Rainbow) col = hsv((hue0 + n * 0.08) % 1, .75, 1);
+    ctx.fillStyle = css(col, Math.max(0, 0.6 - n * 0.055)); circle(p.x, p.y, r * (1 - n * 0.07)); ctx.fill();
+  }
+  const glowCol = sk.Rainbow ? hsv(hue0, .6, 1) : sk.Glow, ga = 0.3 + 0.1 * Math.cos(clock * Math.PI * 2);
+  ctx.fillStyle = css(glowCol, ga); circle(G.blip.x, G.blip.y, r * 2.1); ctx.fill();
+  ctx.fillStyle = css(sk.Core); circle(G.blip.x, G.blip.y, r); ctx.fill();
+  ctx.strokeStyle = css(sk.Glow); ctx.lineWidth = px(3); circle(G.blip.x, G.blip.y, r + px(1.5)); ctx.stroke();
+  if (shielded()) {
+    const left = G.shieldUntil - G.time, a = left < .6 && Math.floor(left * 10) % 2 === 0 ? .2 : 1;
+    ctx.fillStyle = "rgba(255,255,255,.15)"; circle(G.blip.x, G.blip.y, r * 2.8); ctx.fill();
+    ctx.strokeStyle = css(sk.Glow, a); ctx.lineWidth = px(3); circle(G.blip.x, G.blip.y, r * 2.8); ctx.stroke();
+  }
+}
+function drawJoystick() {
+  joy.alpha += ((joy.active() ? 1 : 0) - joy.alpha) * 0.35;
+  if (joy.alpha < 0.02) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = joy.alpha;
+  ctx.fillStyle = "rgba(8,26,44,.3)"; circle(joy.ox, joy.oy, joy.r); ctx.fill();
+  ctx.strokeStyle = css(THEME.Cyan); ctx.lineWidth = 3; circle(joy.ox, joy.oy, joy.r); ctx.stroke();
+  ctx.fillStyle = "rgba(0,229,255,.65)"; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * .46); ctx.fill();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * .46); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+function drawPause() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "rgba(6,20,32,.6)"; ctx.fillRect(0, 0, vw, vh);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#fff"; ctx.font = '26px "Press Start 2P", monospace'; ctx.fillText("PAUSED", vw / 2, vh / 2 - 16);
+  ctx.fillStyle = css(THEME.Muted); ctx.font = "500 18px Ubuntu, sans-serif";
+  ctx.fillText(inputMode === "touch" ? "Tap to keep going" : inputMode === "gamepad" ? "Press A to keep going" : "Click or press any key to keep going", vw / 2, vh / 2 + 24);
+}
+
+// =====================================================================
+// touch joystick (same as the Roblox TouchJoystick module)
+// =====================================================================
+const joy = {
+  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
+  fit() { this.r = clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
+  inZone(x) { return save.device === "phone" || x <= vw * IN.JoyZone; },
+  begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = clamp(y, this.r + 4, vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
+  move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = len(dx, dy); if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
+  finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
+  active() { return this.id !== null; },
+  vector() { const m = len(this.dx, this.dy) / this.r; if (m < IN.JoyDeadzone) return { x: 0, y: 0 };
+    const k = (m - IN.JoyDeadzone) / (1 - IN.JoyDeadzone) / m; return { x: this.dx / this.r * k, y: this.dy / this.r * k }; },
+};
+
+// =====================================================================
+// input
+// =====================================================================
+let mouseTarget = null, padTarget = { x: W / 2, y: H / 2 };
+const keys = new Set();
+function setInputMode(m) {
+  if (inputMode === m) return; inputMode = m;
+  document.body.classList.toggle("mouse", m === "mouse");
+  paintHints(); paintFocus();
+}
+const toArena = (x, y) => ({ x: (x - ax) / as, y: (y - ay) / as });
+window.addEventListener("pointermove", e => {
+  if (e.pointerType === "touch" || save.device === "phone") return;
+  if (inputMode !== "mouse" && Math.abs(e.movementX) + Math.abs(e.movementY) < 4) return;
+  setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
+});
+cv.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch" || save.device === "phone") return;
+  setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
+  if (paused) paused = false;
+});
+cv.addEventListener("touchstart", e => {
+  e.preventDefault(); setInputMode("touch");
+  if (state !== "playing") return;
+  if (paused) { paused = false; return; }
+  for (const t of e.changedTouches) if (!joy.active() && joy.inZone(t.clientX)) joy.begin(t.identifier, t.clientX, t.clientY);
+}, { passive: false });
+cv.addEventListener("touchmove", e => { e.preventDefault(); for (const t of e.changedTouches) joy.move(t.identifier, t.clientX, t.clientY); }, { passive: false });
+const endTouch = e => { for (const t of e.changedTouches) joy.finish(t.identifier); };
+cv.addEventListener("touchend", endTouch); cv.addEventListener("touchcancel", endTouch);
+document.addEventListener("touchstart", () => setInputMode("touch"), { passive: true, capture: true });
+
+const MOVE_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"];
+window.addEventListener("keydown", e => {
+  keys.add(e.code);
+  if (paused && e.code !== "Escape" && e.code !== "KeyP") { paused = false; return; }
+  if (e.code === "KeyM") { toggleMute(); return; }
+  if (state === "playing") {
+    if (MOVE_KEYS.includes(e.code)) { setInputMode("keys"); e.preventDefault(); }
+    if (e.code === "Escape" || e.code === "KeyP") { paused = !paused; userPaused = paused; joy.finish(); }
+    return;
+  }
+  if (!$("device").classList.contains("hidden")) { if (e.code === "Escape" && save.device) pick(save.device); else if (MOVE_KEYS.includes(e.code)) { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") setInputMode("keys"); else nav(e.code); } else if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); pressFocused(); } return; }
+  if (!$("skins").classList.contains("hidden") && e.code === "Escape") { closeSkins(); return; }
+  if (state === "over" && e.code === "Space") { e.preventDefault(); act("again"); return; }
+  if (state === "over" && e.code === "Escape") { act("menu"); return; }
+  if (MOVE_KEYS.includes(e.code)) { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") setInputMode("keys"); else nav(e.code); return; }
+  if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); if (inputMode === "mouse" || inputMode === "touch") { setInputMode("keys"); } pressFocused(); }
+});
+window.addEventListener("keyup", e => keys.delete(e.code));
+window.addEventListener("blur", () => { keys.clear(); joy.finish(); if (state === "playing") paused = true; });
+document.addEventListener("visibilitychange", () => { if (document.hidden && state === "playing") paused = true; });
+
+function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
+function stickVector() {
+  if (inputMode === "keys") {
+    let x = 0, y = 0;
+    if (keys.has("ArrowLeft") || keys.has("KeyA")) x--; if (keys.has("ArrowRight") || keys.has("KeyD")) x++;
+    if (keys.has("ArrowUp") || keys.has("KeyW")) y--; if (keys.has("ArrowDown") || keys.has("KeyS")) y++;
+    const m = len(x, y) || 1; return { x: x / m, y: y / m };
+  }
+  const gp = getPad(); if (!gp) return { x: 0, y: 0 };
+  let x = gp.axes[0] || 0, y = gp.axes[1] || 0;
+  if (gp.buttons[14]?.pressed) x = -1; if (gp.buttons[15]?.pressed) x = 1; if (gp.buttons[12]?.pressed) y = -1; if (gp.buttons[13]?.pressed) y = 1;
+  const m = len(x, y); if (m < IN.PadDeadzone) return { x: 0, y: 0 };
+  const c = Math.pow(Math.min(1, (m - IN.PadDeadzone) / (1 - IN.PadDeadzone)), IN.PadCurve); return { x: x / m * c, y: y / m * c };
+}
+const padPrev = {};
+function pollPad() {
+  const gp = getPad(); if (!gp) return;
+  const pr = i => !!gp.buttons[i]?.pressed, edge = i => pr(i) && !padPrev[i];
+  const ay2 = gp.axes[1] || 0, ax2 = gp.axes[0] || 0;
+  if ((len(ax2, ay2) > 0.4 || [0, 1, 9, 12, 13, 14, 15].some(pr)) && inputMode !== "gamepad") setInputMode("gamepad");
+  if (state === "playing") {
+    if (edge(9)) { paused = !paused; userPaused = paused; } else if (paused && edge(0)) paused = false;
+  } else {
+    if (edge(0)) pressFocused();
+    if (edge(1)) { if (!$("skins").classList.contains("hidden")) closeSkins(); else if (state === "over") act("menu"); }
+    if (edge(12) || (ay2 < -.6 && !padPrev.up)) nav("ArrowUp"); if (edge(13) || (ay2 > .6 && !padPrev.down)) nav("ArrowDown");
+    if (edge(14) || (ax2 < -.6 && !padPrev.left)) nav("ArrowLeft"); if (edge(15) || (ax2 > .6 && !padPrev.right)) nav("ArrowRight");
+  }
+  padPrev.up = ay2 < -.6; padPrev.down = ay2 > .6; padPrev.left = ax2 < -.6; padPrev.right = ax2 > .6;
+  for (let i = 0; i < gp.buttons.length; i++) padPrev[i] = pr(i);
+}
+
+// focus for keyboard / controller
+let focusIdx = 0;
+function navList() {
+  const root = !$("device").classList.contains("hidden") ? "#device" : !$("skins").classList.contains("hidden") ? "#skins" : state === "menu" ? "#menu" : "#over";
+  return [...document.querySelectorAll(`${root} [data-nav]`)].filter(b => b.offsetParent !== null);
+}
+function paintFocus() {
+  document.querySelectorAll(".focus").forEach(b => b.classList.remove("focus"));
+  if (inputMode !== "keys" && inputMode !== "gamepad") return;
+  const l = navList(); if (l.length) l[clamp(focusIdx, 0, l.length - 1)].classList.add("focus");
+}
+function nav(code) { const l = navList(); if (!l.length) return; focusIdx = (focusIdx + (code === "ArrowUp" || code === "ArrowLeft" || code === "KeyW" || code === "KeyA" ? -1 : 1) + l.length) % l.length; paintFocus(); }
+function pressFocused() { const l = navList(); const b = l[clamp(focusIdx, 0, l.length - 1)]; if (b) b.click(); }
+
+// =====================================================================
+// UI glue
+// =====================================================================
+function setState(s) {
+  state = s;
+  $("menu").classList.toggle("hidden", s !== "menu");
+  $("hud").classList.toggle("hidden", s === "menu");
+  $("over").classList.toggle("hidden", s !== "over");
+  document.body.classList.toggle("playing", s === "playing");
+  if (s !== "playing") joy.finish();
+  layout(); focusIdx = 0; paintFocus();
+}
+function showBanner(title, color, note, icon, size = 64, dur = LV.BannerTime) { G.banner = { title, color, note, icon, size, dur, at: clock }; }
+function levelNote(level, def) {
+  const prev = levelDef(level - 1);
+  if (def.ZoomerEvery && !prev.ZoomerEvery) return ["Zoomers incoming!", "Spicy"];
+  if ((def.Chasers || 0) > 0 && !(prev.Chasers || 0)) return ["Chasers are hunting you!", "Chaser"];
+  if ((def.Chasers || 0) > (prev.Chasers || 0)) return ["More chasers!", null];
+  return ["Faster + more bubbles!", null];
+}
+function onLevel(level, def) {
+  const st = stageFor(level);
+  paintIcon($("hudStage"), st.Icon); $("hudLevel").textContent = "LV " + level; $("hudFill").style.background = css(st.Color);
+  if (level > 1) {
+    const [note, icon] = levelNote(level, def);
+    showBanner("LEVEL " + level, st.Color, note, icon); SFX.LevelUp();
+    const m = $("hudMain"); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash");
+  }
+}
+function onStar() { $("hudGems").textContent = G.stars; }
+let lastHud = "";
+function updateHud() {
+  const sc = String(score()), tm = G.time.toFixed(1) + "s";
+  if (sc + tm !== lastHud) { $("hudScore").textContent = sc; $("hudTime").textContent = tm; lastHud = sc + tm; }
+  const a = startOf(G.level), b = startOf(G.level + 1);
+  $("hudFill").style.width = clamp((G.time - a) / (b - a), 0, 1) * 100 + "%";
+}
+
+let reviveDeadline = 0;
+function startRun() {
+  resetRun(); setState("playing");
+  $("hudGems").textContent = "0"; lastHud = "";
+  begin(); showBanner("GO!", THEME.Cyan, null, null, 80, 0.9); SFX.Start();
+}
+function onDeath() {
+  const final = score();
+  updateHud();
+  setTimeout(() => {
+    if (!G.dead || state !== "playing") return;
+    save.gems += G.stars - (G.banked || 0); G.banked = G.stars;
+    const isBest = final > save.best; if (isBest) save.best = final;
+    if (G.entry) save.top = save.top.filter(e => e !== G.entry);
+    G.entry = { s: final, lv: G.level }; save.top.push(G.entry); save.top.sort((a, b) => b.s - a.s); save.top = save.top.slice(0, 10);
+    persist();
+    $("overTitle").textContent = OUCH[rndInt(0, OUCH.length - 1)];
+    $("overScore").textContent = final;
+    const ob = $("overBest");
+    if (isBest && final > 0) { ob.textContent = "NEW BEST!"; ob.className = ""; SFX.NewBest(); CG.happytime(); } else { ob.innerHTML = `Best: ${save.best}`; ob.className = "plain"; }
+    const st = stageFor(G.level);
+    $("overStats").innerHTML = ""; const ic = document.createElement("canvas"); ic.className = "pix"; ic.style.height = "18px"; paintIcon(ic, st.Icon);
+    const gem = document.createElement("canvas"); gem.className = "pix"; gem.style.height = "18px"; paintIcon(gem, "Star");
+    $("overStats").append(ic, ` LV ${G.level} • ${G.time.toFixed(1)}s • `, gem, ` ${G.stars}`);
+    const canGems = !G.revived && save.gems >= REVIVE.Cost;
+    const canAd = !G.revived && CG.ready && G.time >= 15;
+    $("continueBtn").classList.toggle("hidden", !canGems);
+    $("continueAdBtn").classList.toggle("hidden", !canAd);
+    const canRevive = canGems || canAd;
+    $("continueWrap").classList.toggle("hidden", !canRevive);
+    G.adOffered = canAd; G.watchedAd = false;
+    $("continueCost").textContent = REVIVE.Cost;
+    reviveDeadline = canRevive ? clock + REVIVE.Window : 0;
+    setState("over");
+    focusIdx = 0; paintFocus();
+  }, 650);
+}
+let adBusy = false;
+async function act(what) {
+  if (adBusy) return;
+  SFX.Click();
+  if (what === "again") {
+    // a short ad between runs (the SDK spaces them out itself); never right after a rewarded ad
+    if (CG.ready && !G.watchedAd && G.time >= 10) { adBusy = true; reviveDeadline = 0; await CG.ad("midgame"); adBusy = false; }
+    startRun();
+  }
+  else if (what === "continueAd") {
+    if (G.revived || clock > reviveDeadline) return;
+    adBusy = true; const left = reviveDeadline - clock; reviveDeadline = 1e9;
+    const ok = await CG.ad("rewarded"); adBusy = false;
+    if (ok && state === "over") { G.watchedAd = true; if (G.entry) { save.top = save.top.filter(e => e !== G.entry); G.entry = null; persist(); }
+      setState("playing"); revive(); showBanner("CONTINUE!", THEME.Cyan, null, null, 56, 1); }
+    else { reviveDeadline = clock + Math.max(2, left); toast("No ad right now - try the gems continue"); $("continueAdBtn").classList.add("hidden"); paintFocus(); }
+  }
+  else if (what === "menu") { setState("menu"); renderMenu(); }
+  else if (what === "continue") {
+    if (G.revived || save.gems < REVIVE.Cost || clock > reviveDeadline) return;
+    save.gems -= REVIVE.Cost; persist();
+    if (G.entry) { save.top = save.top.filter(e => e !== G.entry); G.entry = null; persist(); }
+    setState("playing"); revive();
+  }
+}
+function paintHints() {
+  const hint = inputMode === "touch" ? (save.device === "phone" ? "Thumb anywhere = joystick • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
+    : inputMode === "gamepad" ? "Left stick to steer • grab 💎, dodge the rest"
+    : inputMode === "keys" ? "Arrow keys / WASD to steer • grab 💎, dodge the rest"
+    : "Steer with your mouse • grab 💎, dodge the rest";
+  $("menuHint").textContent = hint;
+  $("overHint").textContent = inputMode === "gamepad" ? "Ⓐ again   Ⓑ menu" : inputMode === "touch" ? "" : "Space = play again";
+}
+function paintMute() { document.querySelectorAll("canvas[data-sound]").forEach(c => paintIcon(c, save.muted ? "SoundOff" : "SoundOn")); }
+function toggleMute() { save.muted = !save.muted; persist(); paintMute(); if (!save.muted) SFX.Click(); }
+let toastTimer = 0;
+function toast(text) { const t = $("toast"); t.textContent = text; t.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.opacity = 0, 2200); }
+
+function renderMenu() {
+  $("tiles").innerHTML = LV.Stages.map(s => `<div class="tile panel"><div class="bar" style="background:${css(s.Color)}"></div>
+    <canvas class="pix" data-icon="${s.Icon === "Insane" ? "Chaser" : s.Icon}"></canvas><b style="color:${css(s.Color)}">${s.Title}</b><p>${s.Note}</p>
+    <i>LV ${s.From} &nbsp;•&nbsp; ${s.From === 1 ? "START" : startOf(s.From) + "s"}</i></div>`).join("");
+  $("tiles").querySelectorAll("canvas").forEach(c => paintIcon(c, c.dataset.icon));
+  $("bestNum").textContent = save.best;
+  $("boardList").innerHTML = save.top.length
+    ? save.top.map((e, i) => `<li><span class="r">${i + 1}</span><span class="lv">LV ${e.lv}</span><span class="s">${e.s}</span></li>`).join("")
+    : `<div class="empty">No scores yet — be the first!</div>`;
+}
+
+// ---- skins
+function openSkins() { renderShop(); $("skins").classList.remove("hidden"); focusIdx = 0; paintFocus(); }
+function closeSkins() { $("skins").classList.add("hidden"); focusIdx = 1; paintFocus(); }
+function preview(c, kind, item) {
+  const g = c.getContext("2d"); c.width = 240; c.height = 168;
+  if (kind === "skin") {
+    g.fillStyle = "#08182a"; g.fillRect(0, 0, 240, 168);
+    const pts = [[52, 132], [76, 120], [100, 106], [124, 92], [148, 78]];
+    pts.forEach(([x, y], i) => { const col = item.Rainbow ? hsv(i * .16, .75, 1) : item.Alternate ? item.Trail[i % 2] : lerpC(item.Trail[1], item.Trail[0], i / 4);
+      g.fillStyle = css(col, .45 + i * .1); g.beginPath(); g.arc(x, y, 9 + i * 2.5, 0, 7); g.fill(); });
+    g.fillStyle = css(item.Rainbow ? [255, 120, 200] : item.Glow, .45); g.beginPath(); g.arc(164, 70, 46, 0, 7); g.fill();
+    g.fillStyle = css(item.Core); g.beginPath(); g.arc(164, 70, 22, 0, 7); g.fill();
+    g.strokeStyle = css(item.Glow); g.lineWidth = 5; g.beginPath(); g.arc(164, 70, 24, 0, 7); g.stroke();
+  } else {
+    const gr = g.createLinearGradient(0, 0, 0, 168); gr.addColorStop(0, css(item.Top)); gr.addColorStop(1, css(item.Bottom));
+    g.fillStyle = gr; g.fillRect(0, 0, 240, 168);
+    g.fillStyle = css(item.Floor); g.fillRect(36, 34, 168, 100);
+    g.strokeStyle = css(item.Grid, .8); g.lineWidth = 3; g.strokeRect(36, 34, 168, 100);
+    g.fillStyle = css(item.Grid, .4); for (let i = 1; i < 4; i++) g.fillRect(36 + 42 * i, 34, 2, 100);
+  }
+}
+function renderShop() {
+  $("shopGems").textContent = save.gems;
+  const build = (list, kind, owned, equipped, el) => {
+    el.innerHTML = "";
+    for (const it of list) {
+      const d = document.createElement("div"); d.className = "item"; d.dataset.nav = ""; d.tabIndex = 0;
+      const c = document.createElement("canvas"); preview(c, kind, it);
+      const isOwned = owned.includes(it.Id) || !it.Gems, isOn = equipped === it.Id;
+      d.append(c);
+      d.insertAdjacentHTML("beforeend", `<div class="nm">${it.Name}</div><div class="tag ${isOn ? "on" : isOwned ? "own" : ""}">${isOn ? "EQUIPPED" : isOwned ? "EQUIP" : it.Gems + " GEMS"}</div>${it.Featured && !isOwned ? '<div class="feat">FEATURED</div>' : ""}`);
+      d.addEventListener("click", () => buy(kind, it));
+      el.append(d);
+    }
+  };
+  build(SKINS, "skin", save.skins, save.skin, $("skinItems"));
+  build(THEMES, "theme", save.themes, save.theme, $("themeItems"));
+  paintFocus();
+}
+function buy(kind, it) {
+  const owned = kind === "skin" ? save.skins : save.themes;
+  if (!owned.includes(it.Id) && it.Gems) {
+    if (save.gems < it.Gems) { tone(170, .15, { vol: .05 }); toast(`You need ${it.Gems - save.gems} more gems`); return; }
+    save.gems -= it.Gems; owned.push(it.Id); SFX.Star();
+  } else SFX.Click();
+  if (kind === "skin") save.skin = it.Id; else save.theme = it.Id;
+  persist(); const f = focusIdx; renderShop(); focusIdx = f; paintFocus();
+}
+
+// buttons
+const on = (id, fn) => $(id).addEventListener("click", fn);
+on("playBtn", () => { SFX.Click(); startRun(); });
+on("skinsBtn", () => { SFX.Click(); openSkins(); });
+on("skinsClose", () => { SFX.Click(); closeSkins(); });
+on("againBtn", () => act("again"));
+on("overMenuBtn", () => act("menu"));
+on("continueBtn", () => act("continue"));
+on("continueAdBtn", () => act("continueAd"));
+on("hudMenu", () => { if (state === "playing" && !G.dead) { G.running = false; G.dead = true; } act("menu"); });
+on("muteMenu", toggleMute); on("hudMute", toggleMute);
+$("skins").addEventListener("click", e => { if (e.target.id === "skins") closeSkins(); });
+window.addEventListener("resize", layout);
+
+// =====================================================================
+// main loop
+// =====================================================================
+let last = performance.now(), lastDt = 0;
+function frame(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now; lastDt = dt; clock += dt;
+  pollPad();
+  if (state === "playing" && !paused) {
+    let target = null, instant = false;
+    if (inputMode === "mouse") { target = mouseTarget; instant = true; }
+    else {
+      const v = inputMode === "touch" ? joy.vector() : stickVector(), sp = inputMode === "touch" ? IN.JoySpeed : IN.PadSpeed;
+      padTarget.x = clamp(padTarget.x + v.x * sp * dt, A.BlipRadius, W - A.BlipRadius);
+      padTarget.y = clamp(padTarget.y + v.y * sp * dt, A.BlipRadius, H - A.BlipRadius);
+      target = padTarget;
+    }
+    if (inputMode === "mouse" && mouseTarget) padTarget = { x: G.blip.x, y: G.blip.y };
+    if (DEMO) target = demoPilot();
+    update(dt, target, instant);
+    if (G.running) updateHud();
+  }
+  if (!paused) { for (const f of effects) f.t += dt; effects = effects.filter(f => f.t < f.dur); if (shakeT >= 0) shakeT += dt; }
+  if (state === "over") {
+    const left = reviveDeadline - clock;
+    if (reviveDeadline && left <= 0) { reviveDeadline = 0; $("continueWrap").classList.add("hidden"); paintFocus(); }
+    if (reviveDeadline) $("continueBar").style.width = clamp(left / REVIVE.Window, 0, 1) * 100 + "%";
+  }
+  CG.setPlaying(state === "playing" && !G.dead && !(paused && userPaused));
+  if (!paused) userPaused = false;
+  drawBackground();
+  if (state !== "menu") { drawArena(); if (inputMode === "touch") drawJoystick(); }
+  if (paused && state === "playing") drawPause();
+  if (DEMO) drawDemoTitle();
+  requestAnimationFrame(frame);
+}
+
+document.addEventListener("touchend", () => { if (actx && actx.state === "suspended") actx.resume(); }, { passive: true });
+function setDevice(d) {
+  save.device = d; persist();
+  $("deviceLabel").textContent = d === "phone" ? "📱 PHONE" : "🖥 PC";
+  setInputMode(d === "phone" ? "touch" : "mouse");
+}
+function showPicker() { $("device").classList.remove("hidden"); focusIdx = matchMedia("(pointer: coarse)").matches ? 0 : 1; paintFocus(); }
+function pick(d) { SFX.Click(); setDevice(d); $("device").classList.add("hidden"); focusIdx = 0; paintFocus(); }
+on("pickPhone", () => pick("phone"));
+on("pickPc", () => pick("pc"));
+on("deviceMenu", () => { SFX.Click(); showPicker(); });
+CG.init().then(() => {
+  if (!save.device && CG.ready) { // CrazyGames knows the device: don't add a click before play
+    const t = CG.sdk.user && CG.sdk.user.systemInfo && CG.sdk.user.systemInfo.device && CG.sdk.user.systemInfo.device.type;
+    if (t) setDevice(t === "mobile" || t === "tablet" ? "phone" : "pc");
+  }
+  if (DEMO || /^#(shot|cover|video|menu)$/.test(location.hash)) return; // store art: no picker
+  if (save.device) setDevice(save.device); else showPicker();
+});
+resetRun();
+paintMute(); paintHints(); renderMenu();
+document.body.classList.toggle("mouse", inputMode === "mouse");
+setState("menu");
+requestAnimationFrame(frame);
+
+// ---- trailer mode: a little autopilot that dodges and chases gems
+function demoPilot() {
+  let fx = 0, fy = 0; const b = G.blip;
+  for (const e of G.ents) {
+    const dx = b.x - e.x, dy = b.y - e.y, d = Math.max(1, len(dx, dy) - e.r), reach = e.kind === "Zoomer" ? 260 : 150;
+    if (d < reach) { const k = Math.pow((reach - d) / reach, 2) * (e.warn != null ? 0.6 : 1.4); fx += dx / (d + e.r) * k; fy += dy / (d + e.r) * k; }
+    if (e.kind === "Zoomer" && e.warn == null) { const ahead = (b.x - e.x) * e.dx + (b.y - e.y) * e.dy; if (ahead > 0 && ahead < 420) { const side = (b.x - e.x) * -e.dy + (b.y - e.y) * e.dx; fx += -e.dy * Math.sign(side || 1) * 1.6; fy += e.dx * Math.sign(side || 1) * 1.6; } }
+  }
+  const m = 90; if (b.x < m) fx += (m - b.x) / m; if (b.x > W - m) fx -= (b.x - W + m) / m; if (b.y < m) fy += (m - b.y) / m; if (b.y > H - m) fy -= (b.y - H + m) / m;
+  const goal = G.star || { x: W / 2 + Math.cos(clock * .7) * 220, y: H / 2 + Math.sin(clock * .9) * 140 };
+  const gx = goal.x - b.x, gy = goal.y - b.y, gd = Math.max(1, len(gx, gy)); fx += gx / gd * 0.55; fy += gy / gd * 0.55;
+  const f = Math.max(0.001, len(fx, fy)), step = Math.min(70, 30 + f * 40);
+  return { x: b.x + fx / f * step, y: b.y + fy / f * step };
+}
+let demoStart = 0;
+function drawDemoTitle() { // the trailer opens on the cover, then fades into play
+  const t = clock - demoStart, a = t < 1.2 ? 1 : Math.max(0, 1 - (t - 1.2) / 0.5); if (a <= 0) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = a;
+  const g0 = ctx.createRadialGradient(vw / 2, vh / 2, 0, vw / 2, vh / 2, Math.max(vw, vh) * .6); g0.addColorStop(0, "rgba(6,20,32,.8)"); g0.addColorStop(1, "rgba(6,20,32,0)");
+  ctx.fillStyle = g0; ctx.fillRect(0, 0, vw, vh);
+  const size = Math.min(vw * .11, vh * .13); ctx.font = `${size}px "Press Start 2P", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const g = ctx.createLinearGradient(0, vh / 2 - size * 1.4, 0, vh / 2 + size * 1.4); g.addColorStop(0, "#00ebff"); g.addColorStop(1, "#96ff46");
+  ctx.lineJoin = "round"; ctx.lineWidth = size * .14; ctx.strokeStyle = css(THEME.Ink);
+  for (const [txt, y] of [["BLIP", vh / 2 - size * .7], ["PANIC!", vh / 2 + size * .7]]) { ctx.strokeText(txt, vw / 2, y); ctx.fillStyle = g; ctx.fillText(txt, vw / 2, y); }
+  ctx.globalAlpha = 1;
+}
+if (location.hash === "#video") {
+  DEMO = true; inputMode = "keys"; save.muted = true; save.theme = "Ocean"; save.skin = "Classic";
+  startRun();
+  for (let i = 0; i < 60 * 14; i++) update(1 / 60, demoPilot(), false); // jump in at ~14 s (zoomers already on)
+  G.banner = null; effects = [];
+  $("hud").classList.add("hidden"); layout();
+  document.fonts.ready.then(() => {
+    demoStart = clock;
+    const rec = new MediaRecorder(cv.captureStream(60), { mimeType: MediaRecorder.isTypeSupported("video/mp4;codecs=avc1") ? "video/mp4;codecs=avc1" : "video/webm;codecs=vp9", videoBitsPerSecond: 12e6 });
+    const parts = []; rec.ondataavailable = e => parts.push(e.data);
+    rec.onstop = async () => { const blob = new Blob(parts, { type: rec.mimeType }); fetch("http://localhost:8799/" + (vw > vh ? "landscape" : "portrait") + (rec.mimeType.includes("mp4") ? ".mp4" : ".webm"), { method: "POST", body: await blob.arrayBuffer() }).then(() => document.title = "SAVED"); };
+    rec.start(); setTimeout(() => rec.stop(), 19500);
+  });
+}
+
+// Store screenshots only: index.html#shot (gameplay) or #cover (gameplay + logo). Never used in normal play.
+if (location.hash === "#shot" || location.hash === "#cover") {
+  startRun(); inputMode = "keys";
+  for (let i = 0; i < 2400 && G.level < 5; i++) { G.shieldUntil = G.time + 1; padTarget = { x: 500 + Math.cos(i / 60) * 300, y: 312 + Math.sin(i / 45) * 180 }; update(1 / 60, padTarget, false); }
+  for (let i = 0; i < 180; i++) { G.shieldUntil = G.time + 1; update(1 / 60, padTarget, false); }
+  // park the blip in the most open spot so the screenshot reads clearly
+  let best = null, bestD = -1;
+  for (let i = 0; i < 400; i++) { const p = { x: rnd(80, W - 80), y: rnd(80, H - 80) };
+    const d = Math.min(...G.ents.map(e => len(e.x - p.x, e.y - p.y) - e.r)); if (d > bestD) { bestD = d; best = p; } }
+  G.blip = best; G.hist = G.hist.map((_, i) => ({ x: best.x - 9 * i, y: best.y + 5 * i }));
+  G.shieldUntil = null; G.banner = null; G.stars = 6; onStar(); updateHud(); effects = [];
+  if (!G.star) spawnStar();
+  floatText(G.blip.x + 30, G.blip.y - 30, "+50", THEME.Yellow); effects[0].t = .2;
+  window.update = () => {}; G.running = false; effects.forEach(f => f.dur = 1e9);
+  if (location.hash === "#cover") {
+    effects = [];
+    $("hud").classList.add("hidden");
+    const c = document.createElement("div");
+    c.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(rgba(6,20,32,.75) 25%,rgba(6,20,32,0) 70%);pointer-events:none";
+    c.innerHTML = '<h1 id="title" style="font-size:min(11vw,13vh);line-height:1.25;animation:none">BLIP<br>PANIC!</h1>';
+    document.body.appendChild(c);
+  }
+}
+</script>
+</body>
+</html>
