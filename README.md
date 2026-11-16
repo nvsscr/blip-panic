@@ -13,7 +13,7 @@ A fast arcade dodge game in one HTML file, ported from the Roblox version. Steer
 | Device | How |
 | --- | --- |
 | Mouse | The blip follows your cursor |
-| Phone / tablet | Left thumb anywhere = joystick (landscape) |
+| Phone / tablet | Fixed joystick on the left (landscape), ⛶ button for fullscreen |
 | Keyboard | Arrow keys or WASD |
 | Controller | Left stick, A to select, Start to pause |
 | Any | Esc / P pause, M mute |

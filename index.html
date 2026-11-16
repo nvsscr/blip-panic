@@ -83,8 +83,9 @@
   .board .empty { flex: 1; display: grid; place-items: center; color: var(--muted); font-size: min(1.6vw, 2.8vh); text-align: center; }
   .board .foot { text-align: center; color: var(--muted); font-size: min(1.1vw, 2vh); margin-top: 1vh; }
   .hint { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: min(1.7vw, 3vh); }
-  #muteMenu { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 62px; height: 56px; }
-  #deviceMenu { position: fixed; left: calc(max(14px, env(safe-area-inset-left)) + 76px); bottom: max(14px, env(safe-area-inset-bottom)); height: 56px; font-size: 12px; }
+  #menuCorner { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 12px; }
+  #muteMenu { width: 62px; height: 56px; }
+  #deviceMenu, #fullMenu { height: 56px; font-size: 12px; }
   #device { display: grid; place-items: center; background: rgba(6,20,32,.55); z-index: 30; }
   .pick { padding: 26px 30px 30px; text-align: center; width: min(640px, 100%); }
   .pick h2 { font-family: var(--title); color: var(--cyan); font-size: min(26px, 5vw); margin: 0 0 8px; }
@@ -160,7 +161,7 @@
   @media (max-height: 500px) {
     #menu { row-gap: 1vh; padding-top: max(1.5vh, env(safe-area-inset-top)); }
     #muteMenu { width: 48px; height: 44px; }
-    #deviceMenu { height: 44px; left: calc(max(14px, env(safe-area-inset-left)) + 58px); font-size: 10px; }
+    #deviceMenu, #fullMenu { height: 44px; font-size: 10px; } #menuCorner { gap: 8px; }
     .pick { padding: 14px 18px 18px; } .pick p { margin-bottom: 12px; font-size: 14px; }
     .pickRow .btn { height: 120px; } .pickRow svg { width: 36px; height: 36px; }
     .hudMain { height: 46px; gap: 10px; padding: 0 10px; }
@@ -173,6 +174,22 @@
     #overHint { display: none; }
     .shop { padding: 12px 16px; } .shop h3 { margin: 8px 0 6px; } .items { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   }
+  /* Phone mode: arena uses the full height, joystick lives on the left, HUD is a slim column on the right */
+  body.phone #hud { display: grid; grid-template-columns: 1fr 1fr; align-content: center; gap: 6px;
+    left: auto; width: calc(var(--hudW, 118px) + max(8px, env(safe-area-inset-right))); padding: 6px max(8px, env(safe-area-inset-right)) 6px 0; }
+  body.phone .hudMain { grid-column: 1 / -1; flex-direction: column; height: auto; padding: 8px 6px; gap: 6px; }
+  body.phone .hudMain .sep { width: auto; height: 1px; margin: 0 4px; align-self: stretch; }
+  body.phone .lvChip { align-self: stretch; align-items: center; }
+  body.phone .lvChip .row { font-size: 10px; }
+  body.phone #hudScore { min-width: 0; font-size: 17px; }
+  body.phone .gems { font-size: 12px; }
+  body.phone #hudTime { grid-column: 1 / -1; height: 32px; min-width: 0; padding: 0; font-size: 11px; }
+  body.phone #hud .btn { height: 40px; min-width: 0; }
+  body.phone #hudMute { width: auto; } body.phone #hudMenu { font-size: 9px; }
+  body.phone #hudMenu > span { padding: 0; }
+  #hudFull { width: 62px; font-size: 18px; }
+  @media (max-height: 500px) { #hudFull { width: 48px; } body.phone #menuHint { display: none; } }
+  body.phone #hud #hudFull { grid-column: 1 / -1; width: auto; height: 34px; }
   @media (pointer: coarse) and (orientation: portrait) { #rotate { display: flex; } }
   @media (prefers-reduced-motion: reduce) { #title { animation: none; } }
 </style>
@@ -199,8 +216,11 @@
     <div class="foot">Saved on this device</div>
   </div>
   <div class="hint" id="menuHint">Steer with your mouse • grab 💎, dodge the rest</div>
-  <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
-  <button class="btn sec" id="deviceMenu" data-nav><span id="deviceLabel">PC</span></button>
+  <div id="menuCorner">
+    <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
+    <button class="btn sec" id="deviceMenu" data-nav><span id="deviceLabel">PC</span></button>
+    <button class="btn sec hidden" id="fullMenu" data-nav><span>⛶ FULLSCREEN</span></button>
+  </div>
 </div>
 
 <div id="hud" class="layer hidden">
@@ -214,6 +234,7 @@
   <div id="hudTime" class="panel">0.0s</div>
   <button class="btn sec" id="hudMute" aria-label="Sound"><span><canvas class="pix" data-sound style="height:22px"></canvas></span></button>
   <button class="btn sec" id="hudMenu"><span>MENU</span></button>
+  <button class="btn sec hidden" id="hudFull" aria-label="Fullscreen"><span>⛶</span></button>
 </div>
 
 <div id="over" class="hidden">
@@ -440,8 +461,18 @@ function layout() {
   if (state !== "menu") { const r = $("hudMain").getBoundingClientRect(); if (r.height) top = r.bottom + (small ? 8 : 16); }
   const pad = small ? 8 : 18, availW = vw - pad * 2, availH = vh - top - pad;
   as = Math.min(availW / W, availH / H); ax = (vw - W * as) / 2; ay = top + (availH - H * as) / 2;
-  if (state === "menu") { as = Math.min(vw / W, vh / H) * 0.9; ax = (vw - W * as) / 2; ay = (vh - H * as) / 2; }
   joy.fit();
+  if (state !== "menu" && save.device === "phone") {
+    // [ joystick | arena | HUD column ]: the arena gets the full height
+    const hr = $("hud").getBoundingClientRect(), right = hr.width ? hr.left : vw - 130;
+    const insL = Math.max(8, parseFloat(getComputedStyle($("menu")).paddingLeft) || 0) - 4;
+    const joyW = joy.r * 2 + 28, p = 6;
+    as = Math.min((vh - p * 2) / H, (right - p - joyW - insL) / W);
+    const left = insL + joyW, free = right - p - left - W * as;
+    ax = left + free / 2; ay = (vh - H * as) / 2;
+    joy.cx = (insL + ax) / 2; joy.cy = clamp(vh * 0.6, joy.r + 10, vh - joy.r - 10);
+  }
+  if (state === "menu") { as = Math.min(vw / W, vh / H) * 0.9; ax = (vw - W * as) / 2; ay = (vh - H * as) / 2; }
   const o = $("over").style; o.left = ax + "px"; o.top = ay + "px"; o.width = W * as + "px"; o.height = H * as + "px";
 }
 
@@ -849,7 +880,9 @@ function drawBlip() {
   }
 }
 function drawJoystick() {
-  joy.alpha += ((joy.active() ? 1 : 0) - joy.alpha) * 0.35;
+  const fixed = joy.fixed();
+  if (fixed && !joy.active()) { joy.ox = joy.cx; joy.oy = joy.cy; }
+  joy.alpha += ((joy.active() ? 1 : fixed ? 0.5 : 0) - joy.alpha) * 0.35;
   if (joy.alpha < 0.02) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = joy.alpha;
   ctx.fillStyle = "rgba(8,26,44,.3)"; circle(joy.ox, joy.oy, joy.r); ctx.fill();
@@ -869,10 +902,15 @@ function drawPause() {
 // touch joystick (same as the Roblox TouchJoystick module)
 // =====================================================================
 const joy = {
-  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
-  fit() { this.r = clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
-  inZone(x) { return save.device === "phone" || x <= vw * IN.JoyZone; },
-  begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = clamp(y, this.r + 4, vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
+  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0, cx: 0, cy: 0,
+  fixed() { return save.device === "phone" && state !== "menu"; },
+  fit() { this.r = this.fixed() ? clamp(Math.floor(vh * 0.2), 44, 80) : clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
+  // phone mode: a fixed stick on the left, grabbed by any touch on the left side of the arena
+  inZone(x) { return this.fixed() ? x < ax + W * as * 0.35 : x <= vw * IN.JoyZone; },
+  begin(id, x, y) { this.id = id;
+    if (this.fixed()) { this.ox = this.cx; this.oy = this.cy; }
+    else { this.ox = Math.max(x, this.r + 4); this.oy = clamp(y, this.r + 4, vh - this.r - 4); }
+    this.dx = this.dy = 0; this.move(id, x, y); },
   move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = len(dx, dy); if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
   finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
   active() { return this.id !== null; },
@@ -1019,6 +1057,7 @@ function updateHud() {
 
 let reviveDeadline = 0;
 function startRun() {
+  if (save.device === "phone") toggleFull(true); // hide the address bar (GitHub Pages / itch only)
   resetRun(); setState("playing");
   $("hudGems").textContent = "0"; lastHud = "";
   begin(); showBanner("GO!", THEME.Cyan, null, null, 80, 0.9); SFX.Start();
@@ -1080,7 +1119,7 @@ async function act(what) {
   }
 }
 function paintHints() {
-  const hint = inputMode === "touch" ? (save.device === "phone" ? "Thumb anywhere = joystick • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
+  const hint = inputMode === "touch" ? (save.device === "phone" ? "Left thumb = joystick • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
     : inputMode === "gamepad" ? "Left stick to steer • grab 💎, dodge the rest"
     : inputMode === "keys" ? "Arrow keys / WASD to steer • grab 💎, dodge the rest"
     : "Steer with your mouse • grab 💎, dodge the rest";
@@ -1196,7 +1235,7 @@ function frame(now) {
   CG.setPlaying(state === "playing" && !G.dead && !(paused && userPaused));
   if (!paused) userPaused = false;
   drawBackground();
-  if (state !== "menu") { drawArena(); if (inputMode === "touch") drawJoystick(); }
+  if (state !== "menu") { drawArena(); if (inputMode === "touch" || joy.fixed()) drawJoystick(); }
   if (paused && state === "playing") drawPause();
   if (DEMO) drawDemoTitle();
   requestAnimationFrame(frame);
@@ -1206,8 +1245,31 @@ document.addEventListener("touchend", () => { if (actx && actx.state === "suspen
 function setDevice(d) {
   save.device = d; persist();
   $("deviceLabel").textContent = d === "phone" ? "📱 PHONE" : "🖥 PC";
+  document.body.classList.toggle("phone", d === "phone");
   setInputMode(d === "phone" ? "touch" : "mouse");
+  layout();
 }
+// Fullscreen hides the browser's address bar on phones. Not on CrazyGames: their page has its own
+// fullscreen button and doesn't allow a custom one.
+const canFull = () => !CG.ready && !DEMO && !/^#(shot|cover|video|menu)$/.test(location.hash) && !!document.documentElement.requestFullscreen;
+function paintFull() {
+  const ok = canFull();
+  for (const id of ["fullMenu", "hudFull"]) $(id).classList.toggle("hidden", !ok);
+  const on = !!document.fullscreenElement;
+  $("fullMenu").firstElementChild.textContent = on ? "EXIT FULL" : "⛶ FULLSCREEN";
+  $("hudFull").firstElementChild.textContent = on ? "✕" : "⛶";
+}
+function toggleFull(force) {
+  if (!canFull()) return;
+  if (document.fullscreenElement && force !== true) { document.exitFullscreen().catch(() => {}); return; }
+  if (document.fullscreenElement) return;
+  document.documentElement.requestFullscreen({ navigationUI: "hide" })
+    .then(() => { try { screen.orientation.lock("landscape").catch(() => {}); } catch (e) {} })
+    .catch(() => {});
+}
+document.addEventListener("fullscreenchange", () => { paintFull(); layout(); });
+on("fullMenu", () => { SFX.Click(); toggleFull(); });
+on("hudFull", () => { SFX.Click(); toggleFull(); });
 function showPicker() { $("device").classList.remove("hidden"); focusIdx = matchMedia("(pointer: coarse)").matches ? 0 : 1; paintFocus(); }
 function pick(d) { SFX.Click(); setDevice(d); $("device").classList.add("hidden"); focusIdx = 0; paintFocus(); }
 on("pickPhone", () => pick("phone"));
@@ -1218,6 +1280,7 @@ CG.init().then(() => {
     const t = CG.sdk.user && CG.sdk.user.systemInfo && CG.sdk.user.systemInfo.device && CG.sdk.user.systemInfo.device.type;
     if (t) setDevice(t === "mobile" || t === "tablet" ? "phone" : "pc");
   }
+  paintFull();
   if (DEMO || /^#(shot|cover|video|menu)$/.test(location.hash)) return; // store art: no picker
   if (save.device) setDevice(save.device); else showPicker();
 });
