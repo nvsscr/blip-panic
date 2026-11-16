@@ -7,7 +7,7 @@ A fast arcade dodge game in one HTML file, ported from the Roblox version. Steer
 ![Gameplay](promo/shot-gameplay.png)
 
 ## Play
-Open `index.html` in any browser, or play the hosted version on GitHub Pages.
+**[Play it in your browser](https://nvsscr.github.io/blip-panic/)** (PC, phone or tablet), or open `index.html` locally.
 
 ## Controls
 | Device | How |
