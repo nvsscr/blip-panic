@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#06161a">
+<title>Blip Panic</title>
+<meta name="description" content="Grab the gems, dodge everything else. A fast arcade dodge game for mouse, touch and controller.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%233ff2e6'/%3E%3Ccircle cx='16' cy='16' r='10' fill='%23f2fffd'/%3E%3Crect x='11' y='13' width='3' height='5' fill='%2304110f'/%3E%3Crect x='18' y='13' width='3' height='5' fill='%2304110f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Ubuntu:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0: #04110f; --bg1: #0a2a2c; --panel: #0f3236; --panel2: #134046; --line: #1e5a60;
+    --cyan: #3ff2e6; --lime: #b6ff4a; --white: #f2fffd; --dim: #8fb9b5; --red: #ff4f6d;
+    --pink: #ff5fd2; --gold: #ffd84a; --green: #36d66b; --greenDark: #1d8f45;
+    --title: "Press Start 2P", ui-monospace, monospace;
+    --body: "Ubuntu", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg0); color: var(--white);
+    font-family: var(--body); user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+  #game { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+  .layer { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    pointer-events: none; }
+  .layer > * { pointer-events: auto; }
+  .hidden { display: none !important; }
+  .panel { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 3px solid var(--line);
+    border-radius: 18px; box-shadow: 0 8px 0 #031012, 0 18px 40px #0008; }
+  h1.logo { font-family: var(--title); font-size: clamp(26px, 6.5vw, 64px); margin: 0 0 6px; line-height: 1.15; text-align: center;
+    background: linear-gradient(90deg, var(--cyan), var(--lime)); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 0 #031012); letter-spacing: 2px; }
+  .sub { color: var(--dim); text-align: center; margin: 0 0 18px; font-size: clamp(14px, 2.2vw, 18px); }
+  .btn { font-family: var(--title); font-size: clamp(14px, 2.4vw, 20px); color: var(--white); border: 0; cursor: pointer;
+    border-radius: 14px; padding: 16px 28px; min-height: 60px; min-width: 60px; background: var(--green);
+    box-shadow: 0 6px 0 var(--greenDark); transition: transform .08s, box-shadow .08s, filter .1s; letter-spacing: 1px; }
+  .btn:hover, .btn.focus { filter: brightness(1.12); transform: scale(1.04); }
+  .btn:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--greenDark); }
+  .btn.secondary { background: var(--panel2); box-shadow: 0 6px 0 #062022; border: 2px solid var(--line); }
+  .btn.secondary:active { box-shadow: 0 1px 0 #062022; }
+  .btn.small { font-size: 12px; padding: 10px 14px; min-height: 48px; }
+  .btn.focus { outline: 3px solid var(--lime); outline-offset: 3px; }
+
+  /* Menu */
+  #menu { flex-direction: column; overflow-y: auto; }
+  .menuWrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; width: min(980px, 100%); align-items: start; }
+  .menuMain { display: flex; flex-direction: column; align-items: center; padding: 22px 18px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; margin-top: 20px; }
+  .tile { background: var(--bg1); border: 2px solid var(--line); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .tile canvas { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto 6px; }
+  .tile b { display: block; font-family: var(--title); font-size: 10px; color: var(--lime); margin-bottom: 4px; }
+  .tile span { font-size: 13px; color: var(--dim); }
+  .tilesHead { font-family: var(--title); font-size: 11px; color: var(--dim); margin-top: 22px; letter-spacing: 1px; }
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  .board { padding: 16px; }
+  .board h2, .shop h2 { font-family: var(--title); font-size: 13px; margin: 0 0 12px; color: var(--cyan); letter-spacing: 1px; }
+  .board ol { list-style: none; margin: 0; padding: 0; }
+  .board li { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 8px; font-size: 15px; }
+  .board li:nth-child(odd) { background: #ffffff08; }
+  .board li .r { color: var(--dim); width: 28px; }
+  .board li .s { font-weight: 700; }
+  .board .empty { color: var(--dim); font-size: 14px; padding: 6px 2px; }
+  .best { margin-top: 10px; color: var(--dim); font-size: 14px; }
+  .best b { color: var(--gold); }
+  .shop { padding: 16px; }
+  .gemCount { float: right; font-family: var(--title); font-size: 12px; color: var(--cyan); }
+  .skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+  .skin { background: var(--bg1); border: 2px solid var(--line); border-radius: 12px; padding: 8px 4px; text-align: center; cursor: pointer;
+    font-size: 12px; color: var(--dim); min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .skin .dot { width: 26px; height: 26px; border-radius: 50%; }
+  .skin.on { border-color: var(--lime); color: var(--lime); }
+  .skin.locked { opacity: .75; }
+
+  /* HUD */
+  #hud { align-items: flex-start; justify-content: space-between; pointer-events: none; }
+  .hudPanel { display: flex; align-items: center; gap: clamp(10px, 2vw, 22px); padding: 8px 16px; pointer-events: none; }
+  .stat { text-align: center; }
+  .stat small { display: block; font-family: var(--title); font-size: 9px; color: var(--dim); margin-bottom: 4px; }
+  .stat b { font-family: var(--title); font-size: clamp(13px, 2vw, 18px); }
+  .stat.score b { font-size: clamp(16px, 2.8vw, 26px); color: var(--white); }
+  .lvBar { width: 64px; height: 6px; background: #ffffff18; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+  .lvBar i { display: block; height: 100%; width: 0; background: var(--lime); }
+  .hudRight { display: flex; gap: 8px; align-items: center; pointer-events: auto; }
+  .timer { font-family: var(--title); font-size: 14px; padding: 12px 14px; }
+  .iconBtn { width: 52px; height: 52px; min-height: 52px; padding: 0; display: grid; place-items: center; font-size: 22px; }
+
+  /* Banner, hint, toast */
+  #banner { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); font-family: var(--title);
+    font-size: clamp(22px, 5vw, 48px); color: var(--lime); text-shadow: 0 4px 0 #031012; pointer-events: none; opacity: 0;
+    transition: opacity .25s; text-align: center; white-space: nowrap; }
+  #banner small { display: block; font-size: .4em; color: var(--white); margin-top: 10px; }
+  #hint { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+    font-size: clamp(14px, 2vw, 17px); color: var(--dim); background: #0009; padding: 8px 14px; border-radius: 10px;
+    pointer-events: none; white-space: nowrap; transition: opacity .4s; }
+
+  /* Game over */
+  .over { padding: 26px 30px; text-align: center; width: min(460px, 100%); }
+  .over h2 { font-family: var(--title); color: var(--red); font-size: clamp(20px, 4vw, 30px); margin: 0 0 18px; }
+  .over .big { font-family: var(--title); font-size: clamp(34px, 7vw, 54px); margin: 4px 0; }
+  .over .label { font-family: var(--title); font-size: 10px; color: var(--dim); }
+  .newBest { display: inline-block; font-family: var(--title); font-size: 12px; color: #04110f; background: var(--gold);
+    padding: 6px 10px; border-radius: 8px; margin: 8px 0; animation: pop .6s ease-in-out infinite alternate; }
+  @keyframes pop { to { transform: scale(1.08); } }
+  .row3 { display: flex; justify-content: center; gap: 22px; margin: 16px 0 22px; font-size: 15px; color: var(--dim); }
+  .row3 b { color: var(--white); font-family: var(--title); font-size: 13px; display: block; margin-top: 4px; }
+  .overBtns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .overBtns .btn { flex: 1 1 160px; }
+  #reviveBtn { width: 100%; margin-bottom: 12px; background: var(--cyan); color: #04110f; box-shadow: 0 6px 0 #1c9a92; }
+
+  .menuMain { position: relative; }
+  #mute { position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; min-height: 44px; font-size: 18px; }
+  #rotate { position: fixed; inset: 0; background: var(--bg0); z-index: 50; display: none; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; font-family: var(--title); font-size: 14px; text-align: center; padding: 24px; line-height: 1.6; }
+
+  @media (max-width: 760px), (max-height: 520px) {
+    .menuWrap { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .menuMain { padding: 12px; }
+    h1.logo { font-size: clamp(20px, 5vw, 34px); }
+    .sub { margin-bottom: 10px; }
+    .tiles { margin-top: 10px; gap: 6px; }
+    .tilesHead { margin-top: 10px; }
+    .tile { padding: 6px 4px; } .tile span { font-size: 12px; }
+    .board, .shop { padding: 10px; }
+    .board li { padding: 5px 8px; font-size: 14px; }
+    .over { padding: 16px 18px; }
+    .row3 { margin: 10px 0 14px; }
+  }
+  @media (max-height: 520px) {
+    #hud { padding-top: max(6px, env(safe-area-inset-top)); }
+    .hudPanel { padding: 4px 12px; gap: 14px; border-radius: 12px; }
+    .stat small { font-size: 7px; margin-bottom: 2px; }
+    .stat b { font-size: 12px; } .stat.score b { font-size: 16px; }
+    .lvBar { width: 48px; margin-top: 3px; }
+    .timer { font-size: 11px; padding: 8px 10px; }
+    .iconBtn, .btn.small { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 10px; font-size: 11px; }
+  }
+  @media (max-width: 560px) and (orientation: portrait) {
+    .menuWrap { grid-template-columns: 1fr; }
+  }
+  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+    #rotate.need { display: flex; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- MENU -->
+<div id="menu" class="layer">
+  <div class="menuWrap">
+    <div class="menuMain panel">
+      <button class="btn secondary iconBtn" id="mute" aria-label="Sound">♪</button>
+      <h1 class="logo">BLIP<br>PANIC</h1>
+      <p class="sub">Grab the gems. Dodge everything else.</p>
+      <button class="btn" id="playBtn" data-nav>PLAY</button>
+      <div class="tilesHead">SURVIVE TO LEVEL UP</div>
+      <div class="tiles">
+        <div class="tile"><canvas data-icon="bubble" width="10" height="10"></canvas><b>LV 1</b><span>Bubbles</span></div>
+        <div class="tile"><canvas data-icon="zoomer" width="10" height="10"></canvas><b>LV 3</b><span>Zoomers</span></div>
+        <div class="tile"><canvas data-icon="chaser" width="10" height="10"></canvas><b>LV 5</b><span>Chasers</span></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="board panel">
+        <h2>YOUR TOP 10</h2>
+        <ol id="boardList"></ol>
+        <div class="best" id="bestLine"></div>
+      </div>
+      <div class="shop panel">
+        <h2>SKINS <span class="gemCount" id="gemCount">0</span></h2>
+        <div class="skins" id="skins"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="layer hidden">
+  <div class="hudPanel panel">
+    <div class="stat"><small>LEVEL</small><b id="hudLevel">1</b><div class="lvBar"><i id="hudLvBar"></i></div></div>
+    <div class="stat score"><small>SCORE</small><b id="hudScore">0</b></div>
+    <div class="stat"><small>GEMS</small><b id="hudGems" style="color:var(--cyan)">0</b></div>
+  </div>
+  <div class="hudRight">
+    <div class="timer panel" id="hudTime">0.0</div>
+    <button class="btn secondary iconBtn" id="hudMute" aria-label="Sound">♪</button>
+    <button class="btn secondary small" id="hudMenu">MENU</button>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="over" class="layer hidden">
+  <div class="over panel">
+    <h2>BLIPPED!</h2>
+    <div class="label">SCORE</div>
+    <div class="big" id="overScore">0</div>
+    <div id="overBest"></div>
+    <div class="row3">
+      <div>Level<b id="overLevel">1</b></div>
+      <div>Time<b id="overTime">0s</b></div>
+      <div>Gems<b id="overGems" style="color:var(--cyan)">0</b></div>
+    </div>
+    <button class="btn" id="reviveBtn" data-nav>REVIVE · <span id="reviveCost">20</span> GEMS</button>
+    <div class="overBtns">
+      <button class="btn" id="againBtn" data-nav>PLAY AGAIN</button>
+      <button class="btn secondary" id="overMenuBtn" data-nav>MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="banner"></div>
+<div id="hint" class="hidden"></div>
+<div id="rotate"><div style="font-size:42px">⟳</div>Turn your phone sideways<br>to play</div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- config
+const CFG = {
+  W: 1000, H: 625,                 // arena units
+  blipR: 12, blipSpeedFollow: 28,  // mouse follow sharpness
+  stickSpeed: 750, stickDeadzone: 0.12,
+  joyZone: 0.4, joyRadiusFrac: 0.14, joyMin: 48, joyMax: 90,
+  gemValue: 25, gemR: 13,
+  reviveCost: 20,
+  // per level: bubbles, bubble speed, zoomers, chasers
+  levels: [
+    null,
+    { dur: 5, bubbles: 6,  speed: 150, zoomers: 0, chasers: 0 },
+    { dur: 6, bubbles: 8,  speed: 165, zoomers: 0, chasers: 0 },
+    { dur: 8, bubbles: 9,  speed: 180, zoomers: 1, chasers: 0 },
+    { dur: 8, bubbles: 10, speed: 190, zoomers: 2, chasers: 0 },
+    { dur: 8, bubbles: 10, speed: 200, zoomers: 2, chasers: 1 },
+    { dur: 8, bubbles: 11, speed: 210, zoomers: 3, chasers: 1 },
+    { dur: 8, bubbles: 12, speed: 220, zoomers: 3, chasers: 2 },
+    { dur: 8, bubbles: 13, speed: 232, zoomers: 4, chasers: 2 },
+    { dur: 8, bubbles: 14, speed: 245, zoomers: 4, chasers: 3 },
+    { dur: 8, bubbles: 15, speed: 258, zoomers: 5, chasers: 3 },
+  ],
+  stages: { 1: ["WARM-UP", "#b6ff4a"], 3: ["ZOOMERS!", "#ff9f3a"], 5: ["CHASERS!", "#ff5fd2"] },
+};
+const SKINS = [
+  { id: "classic", name: "Classic", price: 0,   fill: "#f2fffd", ring: "#3ff2e6" },
+  { id: "lime",    name: "Lime",    price: 30,  fill: "#b6ff4a", ring: "#2c7a12" },
+  { id: "sunset",  name: "Sunset",  price: 60,  fill: "#ff9f3a", ring: "#ff4f6d" },
+  { id: "grape",   name: "Grape",   price: 100, fill: "#b48cff", ring: "#5b2bd6" },
+  { id: "gold",    name: "Gold",    price: 200, fill: "#ffd84a", ring: "#b8860b" },
+  { id: "ghost",   name: "Ghost",   price: 350, fill: "#ffffff", ring: "#ffffff", ghost: true },
+];
+function levelDef(n) {
+  if (n < CFG.levels.length) return CFG.levels[n];
+  const last = CFG.levels[CFG.levels.length - 1], extra = n - (CFG.levels.length - 1);
+  return { dur: 8, bubbles: Math.min(22, last.bubbles + extra), speed: Math.min(380, last.speed + 12 * extra),
+           zoomers: Math.min(8, last.zoomers + Math.floor(extra / 2)), chasers: Math.min(5, last.chasers + Math.floor(extra / 3)) };
+}
+function levelStart(n) { let t = 0; for (let i = 1; i < n; i++) t += levelDef(i).dur; return t; }
+
+// ---------------------------------------------------------------- save
+const SAVE_KEY = "blipPanic.v1";
+let save = { best: 0, top: [], gems: 0, owned: ["classic"], skin: "classic", muted: false };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+// ---------------------------------------------------------------- canvas
+const cv = document.getElementById("game"), ctx = cv.getContext("2d");
+let vw = 0, vh = 0, dpr = 1, scale = 1, ox = 0, oy = 0; // arena -> screen
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vw = window.innerWidth; vh = window.innerHeight;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  let hudSpace = 0;
+  if (state === "playing" || state === "over") {
+    for (const el of document.querySelectorAll(".hudPanel, .hudRight")) hudSpace = Math.max(hudSpace, el.getBoundingClientRect().bottom);
+    hudSpace = hudSpace || Math.min(78, vh * 0.14);
+  }
+  const pad = 10, availH = vh - hudSpace - pad * 2, availW = vw - pad * 2;
+  scale = Math.min(availW / CFG.W, availH / CFG.H);
+  ox = (vw - CFG.W * scale) / 2; oy = hudSpace + pad + (availH - CFG.H * scale) / 2;
+  joy.fit();
+  document.getElementById("rotate").classList.toggle("need", true);
+}
+const toArena = (x, y) => ({ x: (x - ox) / scale, y: (y - oy) / scale });
+
+// ---------------------------------------------------------------- audio (synth, no files)
+let actx = null;
+function beep(freq, dur, type = "square", vol = 0.06, slide = 0) {
+  if (save.muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+const sfx = {
+  gem() { beep(880, 0.08); setTimeout(() => beep(1320, 0.1), 60); },
+  level() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.12, "square", 0.05), i * 80)); },
+  hit() { beep(220, 0.45, "sawtooth", 0.08, -180); },
+  click() { beep(600, 0.05, "square", 0.04); },
+  go() { beep(440, 0.1); setTimeout(() => beep(880, 0.18), 110); },
+};
+
+// ---------------------------------------------------------------- pixel icons
+const ICONS = {
+  bubble: { pal: { a: "#ff5a78", b: "#ffd0da", c: "#5a0f22" }, rows: [
+    "...aaaa...", "..aaaaaa..", ".aabbaaaa.", ".abbaaaaa.", ".aaaaaaaa.", ".aaaaaaaa.", ".aaaaaaaa.", "..aaaaaa..", "...aaaa...", ".........." ] },
+  zoomer: { pal: { a: "#ff9f3a", b: "#ffe2a8", c: "#ff4f6d" }, rows: [
+    "..........", "c...aaa...", ".c.aaaaa..", "cc.aabaaa.", "..caabbaaa", "cc.aabaaa.", ".c.aaaaa..", "c...aaa...", "..........", ".........." ] },
+  chaser: { pal: { a: "#ff5fd2", b: "#ffffff", c: "#2a0a24" }, rows: [
+    "..a....a..", "...a..a...", "..aaaaaa..", ".aabaabaa.", ".aacaacaa.", "aaaaaaaaaa", "a.aaaaaa.a", "a.a....a.a", "...aa.aa..", ".........." ] },
+  gem: { pal: { a: "#3ff2e6", b: "#e8fffd", c: "#18a59c" }, rows: [
+    "..........", "..aaaaaa..", ".abbaaaaa.", "abbaaaaaac", ".aaaaaaac.", "..aaaaac..", "...aaac...", "....ac....", "..........", ".........." ] },
+};
+function drawIcon(c, name) {
+  const ic = ICONS[name], g = c.getContext("2d");
+  g.clearRect(0, 0, c.width, c.height);
+  ic.rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ic.pal[ch]) { g.fillStyle = ic.pal[ch]; g.fillRect(x, y, 1, 1); } }));
+}
+document.querySelectorAll("canvas[data-icon]").forEach(c => drawIcon(c, c.dataset.icon));
+const iconSprites = {};
+for (const k in ICONS) { const c = document.createElement("canvas"); c.width = c.height = 10; drawIcon(c, k); iconSprites[k] = c; }
+
+// ---------------------------------------------------------------- game state
+let state = "menu"; // menu | playing | over
+let paused = false;
+let banked = 0, lastEntry = null, popups = [];
+let blip, bubbles, zoomers, chasers, gem, particles, t, score, gemsRun, level, revived, shake, inv, flash;
+let target = { x: CFG.W / 2, y: CFG.H / 2 };
+let inputMode = matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+function spawnEdge(r) { // somewhere away from the blip
+  for (let i = 0; i < 30; i++) {
+    const p = { x: rnd(r, CFG.W - r), y: rnd(r, CFG.H - r) };
+    if (Math.hypot(p.x - blip.x, p.y - blip.y) > 220) return p;
+  }
+  return { x: r, y: r };
+}
+function addBubble(speed) {
+  const r = rnd(14, 30), p = spawnEdge(r), a = rnd(0, Math.PI * 2), f = rnd(0.8, 1.15), s = speed * f;
+  bubbles.push({ x: p.x, y: p.y, r, vx: Math.cos(a) * s, vy: Math.sin(a) * s, f, born: t });
+}
+function addZoomer() {
+  const fromLeft = Math.random() < 0.5, horiz = Math.random() < 0.6;
+  const z = { r: 15, warn: 0.9, born: t };
+  if (horiz) { z.y = rnd(40, CFG.H - 40); z.x = fromLeft ? -40 : CFG.W + 40; z.vx = (fromLeft ? 1 : -1) * rnd(520, 640); z.vy = 0; }
+  else { z.x = rnd(40, CFG.W - 40); z.y = fromLeft ? -40 : CFG.H + 40; z.vy = (fromLeft ? 1 : -1) * rnd(480, 600); z.vx = 0; }
+  zoomers.push(z);
+}
+function addChaser() { const p = spawnEdge(16); chasers.push({ x: p.x, y: p.y, r: 16, vx: 0, vy: 0, born: t }); }
+function placeGem() {
+  for (let i = 0; i < 40; i++) {
+    const p = { x: rnd(60, CFG.W - 60), y: rnd(60, CFG.H - 60) };
+    if (Math.hypot(p.x - blip.x, p.y - blip.y) > 160) { gem = { x: p.x, y: p.y, born: t }; return; }
+  }
+  gem = { x: CFG.W / 2, y: CFG.H / 2, born: t };
+}
+
+function startRun() {
+  blip = { x: CFG.W / 2, y: CFG.H / 2, trail: [] };
+  target = { x: blip.x, y: blip.y };
+  bubbles = []; zoomers = []; chasers = []; particles = []; popups = []; paused = false;
+  t = 0; score = 0; gemsRun = 0; banked = 0; lastEntry = null; level = 0; revived = false; shake = 0; inv = 1.2; flash = 0;
+  zoomTimer = 1.5;
+  placeGem();
+  setLevel(1);
+  setState("playing");
+  showBanner("GO!", "", 700);
+  sfx.go();
+  showHint();
+}
+let zoomTimer = 0;
+function setLevel(n) {
+  level = n;
+  const d = levelDef(n);
+  while (bubbles.length < d.bubbles) addBubble(d.speed);
+  while (chasers.length < d.chasers) addChaser();
+  if (n > 1) {
+    const st = CFG.stages[n];
+    showBanner("LEVEL " + n, st ? st[0] : "", 1300, st ? st[1] : null);
+    sfx.level();
+  }
+}
+
+// ---------------------------------------------------------------- update
+function update(dt) {
+  t += dt;
+  inv = Math.max(0, inv - dt); flash = Math.max(0, flash - dt * 3); shake = Math.max(0, shake - dt * 30);
+  // level ups
+  while (t >= levelStart(level + 1)) setLevel(level + 1);
+  const d = levelDef(level);
+  // move blip
+  if (inputMode === "mouse") {
+    const k = 1 - Math.exp(-CFG.blipSpeedFollow * dt);
+    blip.x += (target.x - blip.x) * k; blip.y += (target.y - blip.y) * k;
+  } else {
+    const v = inputMode === "touch" ? joy.vector() : padVector();
+    blip.x += v.x * CFG.stickSpeed * dt; blip.y += v.y * CFG.stickSpeed * dt;
+  }
+  blip.x = Math.max(CFG.blipR, Math.min(CFG.W - CFG.blipR, blip.x));
+  blip.y = Math.max(CFG.blipR, Math.min(CFG.H - CFG.blipR, blip.y));
+  blip.trail.push({ x: blip.x, y: blip.y }); if (blip.trail.length > 10) blip.trail.shift();
+
+  // bubbles: bounce, ease toward level speed
+  for (const b of bubbles) {
+    const sp = Math.hypot(b.vx, b.vy) || 1, ns = sp + (d.speed * b.f - sp) * Math.min(1, dt * 0.8);
+    b.vx *= ns / sp; b.vy *= ns / sp;
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); } if (b.x > CFG.W - b.r) { b.x = CFG.W - b.r; b.vx = -Math.abs(b.vx); }
+    if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy); } if (b.y > CFG.H - b.r) { b.y = CFG.H - b.r; b.vy = -Math.abs(b.vy); }
+  }
+  // zoomers
+  if (d.zoomers > 0) {
+    zoomTimer -= dt;
+    const live = zoomers.length;
+    if (zoomTimer <= 0 && live < d.zoomers) { addZoomer(); zoomTimer = rnd(0.8, 1.8); }
+  }
+  for (const z of zoomers) {
+    if (z.warn > 0) { z.warn -= dt; continue; }
+    z.x += z.vx * dt; z.y += z.vy * dt;
+    if (z.x < -80 || z.x > CFG.W + 80 || z.y < -80 || z.y > CFG.H + 80) z.dead = true;
+  }
+  zoomers = zoomers.filter(z => !z.dead);
+  // chasers: steer toward blip, capped speed
+  const cs = 120 + level * 9;
+  for (const c of chasers) {
+    const dx = blip.x - c.x, dy = blip.y - c.y, dist = Math.hypot(dx, dy) || 1;
+    c.vx += (dx / dist) * 420 * dt; c.vy += (dy / dist) * 420 * dt;
+    const s = Math.hypot(c.vx, c.vy); if (s > cs) { c.vx *= cs / s; c.vy *= cs / s; }
+    c.x += c.vx * dt; c.y += c.vy * dt;
+  }
+  // gem
+  if (gem && Math.hypot(gem.x - blip.x, gem.y - blip.y) < CFG.gemR + CFG.blipR + 4) {
+    gemsRun++; score += CFG.gemValue; sfx.gem(); burst(gem.x, gem.y, "#3ff2e6", 14); popup(gem.x, gem.y, "+" + CFG.gemValue, "#3ff2e6"); placeGem();
+  }
+  // score: 10 per second
+  score += dt * 10;
+  // collisions
+  if (inv <= 0) {
+    const r = CFG.blipR - 2; // a little forgiving
+    for (const b of bubbles) if (t - b.born > 0.6) { const d0 = Math.hypot(b.x - blip.x, b.y - blip.y); if (d0 < b.r + r) return die(); nearMiss(b, d0); }
+    for (const z of zoomers) if (z.warn <= 0) { const d0 = Math.hypot(z.x - blip.x, z.y - blip.y); if (d0 < z.r + r) return die(); nearMiss(z, d0); }
+    for (const c of chasers) if (t - c.born > 0.8 && Math.hypot(c.x - blip.x, c.y - blip.y) < c.r + r) return die();
+  }
+  updateParticles(dt);
+  updateHud();
+}
+function nearMiss(h, dist) {
+  if (dist < h.r + CFG.blipR + 16) h.close = true;
+  else if (h.close && dist > h.r + CFG.blipR + 34) { // it got really close and is now leaving
+    h.close = false;
+    if (t - (h.nm || -9) > 1.5) { h.nm = t; score += 5; popup(blip.x, blip.y - 22, "CLOSE! +5", "#ffd84a"); beep(1200, 0.05, "triangle", 0.04); }
+  }
+}
+function popup(x, y, text, color) { popups.push({ x, y, text, color, life: 0.9 }); }
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) { const a = rnd(0, 7), s = rnd(80, 320);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.3, 0.7), max: 0.7, color }); }
+}
+function updateParticles(dt) {
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const p of popups) { p.y -= 50 * dt; p.life -= dt; }
+  popups = popups.filter(p => p.life > 0);
+}
+function die() {
+  sfx.hit(); shake = 14; flash = 1;
+  burst(blip.x, blip.y, "#ff4f6d", 30); burst(blip.x, blip.y, "#ffffff", 14);
+  if (navigator.vibrate && navigator.userActivation?.hasBeenActive) try { navigator.vibrate(120); } catch (e) {}
+  joy.finish();
+  setState("over");
+  const final = Math.floor(score);
+  save.gems += gemsRun - banked; banked = gemsRun;
+  const isBest = final > save.best;
+  if (isBest) save.best = final;
+  lastEntry = { s: final, lv: level, d: Date.now() };
+  save.top.push(lastEntry); save.top.sort((a, b) => b.s - a.s); save.top = save.top.slice(0, 10);
+  persist();
+  document.getElementById("overScore").textContent = final;
+  document.getElementById("overBest").innerHTML = isBest && final > 0 ? '<span class="newBest">NEW BEST!</span>' : '<div class="label" style="margin:8px 0">BEST ' + save.best + '</div>';
+  document.getElementById("overLevel").textContent = level;
+  document.getElementById("overTime").textContent = t.toFixed(1) + "s";
+  document.getElementById("overGems").textContent = gemsRun;
+  const rb = document.getElementById("reviveBtn");
+  rb.classList.toggle("hidden", revived || save.gems < CFG.reviveCost);
+  document.getElementById("reviveCost").textContent = CFG.reviveCost;
+  focusFirst();
+}
+function revive() {
+  if (revived || save.gems < CFG.reviveCost) return;
+  save.gems -= CFG.reviveCost; persist();
+  revived = true; inv = 2;
+  // clear hazards near the blip
+  bubbles = bubbles.filter(b => Math.hypot(b.x - blip.x, b.y - blip.y) > 200);
+  zoomers = []; chasers.forEach(c => { const p = spawnEdge(16); c.x = p.x; c.y = p.y; c.vx = c.vy = 0; c.born = t; });
+  const d = levelDef(level); while (bubbles.length < d.bubbles) addBubble(d.speed);
+  // remove the score already banked to the top list
+  save.top = save.top.filter(e => e !== lastEntry); persist();
+  target = { x: blip.x, y: blip.y };
+  setState("playing");
+  showBanner("REVIVED!", "", 900, "#3ff2e6"); sfx.go();
+}
+
+// ---------------------------------------------------------------- draw
+function draw() {
+  const w = cv.width, h = cv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#0a2a2c"); g.addColorStop(1, "#04110f");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // faint grid over the whole screen
+  ctx.strokeStyle = "rgba(63,242,230,0.05)"; ctx.lineWidth = 1;
+  for (let x = 0; x < vw; x += 40) { ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, vh); ctx.stroke(); }
+  for (let y = 0; y < vh; y += 40) { ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(vw, y + .5); ctx.stroke(); }
+  if (state === "menu") { drawMenuDemo(); return; }
+
+  const sx = shake ? rnd(-shake, shake) : 0, sy = shake ? rnd(-shake, shake) : 0;
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (ox + sx), dpr * (oy + sy));
+  // arena
+  ctx.fillStyle = "rgba(4,17,15,0.55)"; roundRect(0, 0, CFG.W, CFG.H, 18); ctx.fill();
+  ctx.strokeStyle = "#1e5a60"; ctx.lineWidth = 4; roundRect(0, 0, CFG.W, CFG.H, 18); ctx.stroke();
+  ctx.save(); roundRect(0, 0, CFG.W, CFG.H, 18); ctx.clip();
+  // zoomer warnings
+  for (const z of zoomers) if (z.warn > 0) {
+    ctx.fillStyle = `rgba(255,79,109,${0.12 + 0.12 * Math.sin(t * 30)})`;
+    if (z.vy === 0) ctx.fillRect(0, z.y - z.r, CFG.W, z.r * 2); else ctx.fillRect(z.x - z.r, 0, z.r * 2, CFG.H);
+  }
+  // gem
+  if (gem) { const bob = Math.sin((t - gem.born) * 5) * 4, s = CFG.gemR * 2.6;
+    ctx.globalAlpha = 0.25; ctx.fillStyle = "#3ff2e6"; circle(gem.x, gem.y + bob, CFG.gemR * 1.7); ctx.fill(); ctx.globalAlpha = 1;
+    sprite("gem", gem.x, gem.y + bob, s); }
+  // bubbles
+  for (const b of bubbles) {
+    const fade = Math.min(1, (t - b.born) / 0.6);
+    ctx.globalAlpha = fade * (t - b.born < 0.6 ? 0.5 : 1);
+    ctx.fillStyle = "#ff5a78"; circle(b.x, b.y, b.r); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; circle(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.28); ctx.fill();
+    ctx.strokeStyle = "#5a0f22"; ctx.lineWidth = 3; circle(b.x, b.y, b.r); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  for (const z of zoomers) if (z.warn <= 0) {
+    const a = Math.atan2(z.vy, z.vx);
+    const tx = z.x - Math.cos(a) * 90, ty = z.y - Math.sin(a) * 90, tg = ctx.createLinearGradient(tx, ty, z.x, z.y);
+    tg.addColorStop(0, "rgba(255,159,58,0)"); tg.addColorStop(1, "rgba(255,200,90,0.75)");
+    ctx.strokeStyle = tg; ctx.lineWidth = z.r * 1.1; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(z.x, z.y); ctx.stroke();
+    ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(a); sprite("zoomer", 0, 0, z.r * 2.6); ctx.restore();
+  }
+  for (const c of chasers) {
+    ctx.globalAlpha = Math.min(1, (t - c.born) / 0.8);
+    ctx.fillStyle = "rgba(255,95,210,0.18)"; circle(c.x, c.y, c.r * 1.6); ctx.fill();
+    sprite("chaser", c.x, c.y + Math.sin(t * 8) * 1.5, c.r * 2.5);
+  }
+  ctx.globalAlpha = 1;
+  // blip
+  if (state === "playing" || flash > 0) drawBlip(blip.x, blip.y, inv > 0 && Math.floor(t * 12) % 2 === 0);
+  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); }
+  ctx.textAlign = "center"; ctx.font = "18px 'Press Start 2P', monospace";
+  for (const p of popups) { ctx.globalAlpha = Math.min(1, p.life * 2.5); ctx.fillStyle = "#031012"; ctx.fillText(p.text, p.x + 2, p.y + 2); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  if (flash > 0) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = `rgba(255,79,109,${flash * 0.25})`; ctx.fillRect(0, 0, vw, vh); }
+  drawJoystick();
+}
+function drawBlip(x, y, blink) {
+  const sk = SKINS.find(s => s.id === save.skin) || SKINS[0];
+  const r = CFG.blipR * (vh < 500 ? 1.35 : 1);
+  for (let i = 0; i < blip.trail.length; i++) { const p = blip.trail[i]; ctx.globalAlpha = (i / blip.trail.length) * 0.3;
+    ctx.fillStyle = sk.ring; circle(p.x, p.y, r * (i / blip.trail.length)); ctx.fill(); }
+  ctx.globalAlpha = blink ? 0.35 : (sk.ghost ? 0.7 : 1);
+  ctx.fillStyle = sk.ring; circle(x, y, r + 4); ctx.fill();
+  ctx.fillStyle = sk.fill; circle(x, y, r); ctx.fill();
+  ctx.fillStyle = "#04110f"; ctx.fillRect(x - r * 0.45, y - r * 0.3, r * 0.25, r * 0.4); ctx.fillRect(x + r * 0.2, y - r * 0.3, r * 0.25, r * 0.4);
+  ctx.globalAlpha = 1;
+}
+let demo = null;
+function drawMenuDemo() { // drifting bubbles behind the menu
+  if (!demo) demo = Array.from({ length: 14 }, () => ({ x: rnd(0, 1), y: rnd(0, 1), r: rnd(10, 30), vx: rnd(-0.03, 0.03), vy: rnd(-0.03, 0.03) }));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const b of demo) {
+    b.x = (b.x + b.vx / 60 + 1) % 1; b.y = (b.y + b.vy / 60 + 1) % 1;
+    ctx.globalAlpha = 0.14; ctx.fillStyle = "#ff5a78"; circle(b.x * vw, b.y * vh, b.r); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function sprite(name, x, y, size) { ctx.imageSmoothingEnabled = false; ctx.drawImage(iconSprites[name], x - size / 2, y - size / 2, size, size); }
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0, r), 0, Math.PI * 2); }
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+// ---------------------------------------------------------------- touch joystick
+const joy = {
+  id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0,
+  fit() { this.r = Math.max(CFG.joyMin, Math.min(CFG.joyMax, Math.floor(vh * CFG.joyRadiusFrac))); },
+  inZone(x) { return x <= vw * CFG.joyZone; },
+  begin(id, x, y) { this.id = id; this.ox = Math.max(x, this.r + 4); this.oy = Math.min(Math.max(y, this.r + 4), vh - this.r - 4); this.dx = this.dy = 0; this.move(id, x, y); },
+  move(id, x, y) { if (id !== this.id) return; let dx = x - this.ox, dy = y - this.oy; const d = Math.hypot(dx, dy);
+    if (d > this.r) { dx *= this.r / d; dy *= this.r / d; } this.dx = dx; this.dy = dy; },
+  finish(id) { if (id !== undefined && id !== this.id) return; this.id = null; this.dx = this.dy = 0; },
+  active() { return this.id !== null; },
+  vector() { const m = Math.hypot(this.dx, this.dy) / this.r; if (m < CFG.stickDeadzone) return { x: 0, y: 0 };
+    const k = (m - CFG.stickDeadzone) / (1 - CFG.stickDeadzone) / m; return { x: this.dx / this.r * k, y: this.dy / this.r * k }; },
+};
+function drawJoystick() {
+  joy.alpha += ((joy.active() ? 1 : 0) - joy.alpha) * 0.35;
+  if (joy.alpha < 0.02 || inputMode !== "touch") return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalAlpha = joy.alpha;
+  ctx.fillStyle = "rgba(15,50,54,0.45)"; circle(joy.ox, joy.oy, joy.r); ctx.fill();
+  ctx.strokeStyle = "#3ff2e6"; ctx.lineWidth = 3; circle(joy.ox, joy.oy, joy.r); ctx.stroke();
+  ctx.fillStyle = "rgba(63,242,230,0.65)"; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * 0.46); ctx.fill();
+  ctx.strokeStyle = "#f2fffd"; ctx.lineWidth = 2; circle(joy.ox + joy.dx, joy.oy + joy.dy, joy.r * 0.46); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------- input
+function setInput(m) { if (inputMode !== m) { inputMode = m; showHint(); } }
+cv.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") return; // handled by touch events
+  setInput("mouse"); const a = toArena(e.clientX, e.clientY); target = a;
+});
+window.addEventListener("pointermove", e => {
+  if (e.pointerType === "touch") return;
+  if (inputMode !== "mouse" && (Math.abs(e.movementX) + Math.abs(e.movementY) < 3)) return;
+  setInput("mouse"); target = toArena(e.clientX, e.clientY);
+});
+cv.addEventListener("touchstart", e => {
+  e.preventDefault();
+  setInput("touch");
+  if (state !== "playing") return;
+  if (paused) { paused = false; return; }
+  for (const tch of e.changedTouches) if (!joy.active() && joy.inZone(tch.clientX)) joy.begin(tch.identifier, tch.clientX, tch.clientY);
+}, { passive: false });
+cv.addEventListener("touchmove", e => { e.preventDefault(); for (const tch of e.changedTouches) joy.move(tch.identifier, tch.clientX, tch.clientY); }, { passive: false });
+const endTouch = e => { for (const tch of e.changedTouches) joy.finish(tch.identifier); };
+cv.addEventListener("touchend", endTouch); cv.addEventListener("touchcancel", endTouch);
+document.addEventListener("touchstart", () => setInput("touch"), { passive: true });
+
+const keys = new Set();
+window.addEventListener("keydown", e => {
+  keys.add(e.code); if (paused && e.code !== "Escape" && e.code !== "KeyP") { paused = false; return; }
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
+    if (state === "playing") { setInput("keys"); e.preventDefault(); } else { navMenu(e.code); e.preventDefault(); }
+  }
+  if ((e.code === "Enter" || e.code === "Space") && state !== "playing") { e.preventDefault(); pressFocused(); }
+  if (e.code === "KeyM") toggleMute();
+  if ((e.code === "Escape" || e.code === "KeyP") && state === "playing") { paused = !paused; joy.finish(); return; }
+});
+window.addEventListener("keyup", e => keys.delete(e.code));
+window.addEventListener("blur", () => { keys.clear(); joy.finish(); });
+
+function padVector() {
+  if (inputMode === "keys") {
+    let x = 0, y = 0;
+    if (keys.has("ArrowLeft") || keys.has("KeyA")) x -= 1; if (keys.has("ArrowRight") || keys.has("KeyD")) x += 1;
+    if (keys.has("ArrowUp") || keys.has("KeyW")) y -= 1; if (keys.has("ArrowDown") || keys.has("KeyS")) y += 1;
+    const m = Math.hypot(x, y) || 1; return { x: x / m, y: y / m };
+  }
+  const gp = getPad(); if (!gp) return { x: 0, y: 0 };
+  let x = gp.axes[0] || 0, y = gp.axes[1] || 0;
+  if (gp.buttons[14]?.pressed) x = -1; if (gp.buttons[15]?.pressed) x = 1; if (gp.buttons[12]?.pressed) y = -1; if (gp.buttons[13]?.pressed) y = 1;
+  const m = Math.hypot(x, y); if (m < 0.2) return { x: 0, y: 0 };
+  const c = Math.min(1, Math.pow((m - 0.2) / 0.8, 1.5)); return { x: x / m * c, y: y / m * c };
+}
+function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
+let padPrev = {};
+function pollPad() {
+  const gp = getPad(); if (!gp) return;
+  const pressed = i => gp.buttons[i]?.pressed, edge = i => pressed(i) && !padPrev[i];
+  const moved = Math.hypot(gp.axes[0] || 0, gp.axes[1] || 0) > 0.4 || [0, 1, 9, 12, 13, 14, 15].some(pressed);
+  if (moved && inputMode !== "pad") setInput("pad");
+  if (state !== "playing") {
+    if (edge(0)) pressFocused();
+    if (edge(12) || edge(14)) navMenu("ArrowUp"); if (edge(13) || edge(15)) navMenu("ArrowDown");
+    const ay = gp.axes[1] || 0; if (ay < -0.6 && !padPrev.up) navMenu("ArrowUp"); if (ay > 0.6 && !padPrev.down) navMenu("ArrowDown");
+    padPrev.up = ay < -0.6; padPrev.down = ay > 0.6;
+  } else if (edge(9)) { paused = !paused; } else if (paused && edge(0)) { paused = false; }
+  for (let i = 0; i < gp.buttons.length; i++) padPrev[i] = pressed(i);
+}
+
+// keyboard / controller focus for menus
+function navList() { return [...document.querySelectorAll(state === "menu" ? "#menu [data-nav], #menu .skin" : "#over [data-nav]")].filter(b => b.offsetParent !== null); }
+let focusIdx = 0;
+function focusFirst() { focusIdx = 0; paintFocus(); }
+function paintFocus() { document.querySelectorAll(".focus").forEach(b => b.classList.remove("focus")); if (inputMode === "mouse" || inputMode === "touch") return; const l = navList(); if (l[focusIdx]) l[focusIdx].classList.add("focus"); }
+function navMenu(code) { const l = navList(); if (!l.length) return; if (inputMode === "mouse" || inputMode === "touch") inputMode = "keys";
+  focusIdx = (focusIdx + (code === "ArrowUp" || code === "KeyW" || code === "ArrowLeft" || code === "KeyA" ? -1 : 1) + l.length) % l.length; paintFocus(); }
+function pressFocused() { const l = navList(); (l[focusIdx] || l[0])?.click(); }
+
+// ---------------------------------------------------------------- UI glue
+const $ = id => document.getElementById(id);
+function setState(s) {
+  state = s;
+  $("menu").classList.toggle("hidden", s !== "menu");
+  $("hud").classList.toggle("hidden", s === "menu");
+  $("over").classList.toggle("hidden", s !== "over");
+  if (s !== "playing") { $("hint").classList.add("hidden"); clearTimeout(bannerTimer); $("banner").style.opacity = 0; }
+  resize();
+  if (s === "menu") { renderMenu(); focusFirst(); }
+}
+function updateHud() {
+  $("hudScore").textContent = Math.floor(score);
+  $("hudGems").textContent = gemsRun;
+  $("hudLevel").textContent = level;
+  const st = CFG.stages[[5, 3, 1].find(n => level >= n)]; $("hudLevel").style.color = st[1];
+  const a = levelStart(level), b = levelStart(level + 1);
+  $("hudLvBar").style.width = Math.min(100, (t - a) / (b - a) * 100) + "%";
+  $("hudTime").textContent = t.toFixed(1);
+}
+let bannerTimer = 0;
+function showBanner(text, sub, ms, color) {
+  const b = $("banner"); b.innerHTML = text + (sub ? "<small>" + sub + "</small>" : ""); b.style.color = color || "var(--lime)";
+  b.style.opacity = 1; clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.style.opacity = 0, ms);
+}
+let hintTimer = 0;
+function showHint() {
+  if (state !== "playing") return;
+  const h = $("hint");
+  h.textContent = inputMode === "touch" ? "Left thumb = joystick · grab 💎, dodge the rest"
+    : inputMode === "pad" ? "Left stick to move · grab 💎, dodge the rest"
+    : inputMode === "keys" ? "Arrows / WASD · grab 💎, dodge the rest · Esc = pause"
+    : "Steer with your mouse · grab 💎, dodge the rest · Esc = pause";
+  h.classList.remove("hidden"); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => h.style.opacity = 0, 3500);
+}
+function renderMenu() {
+  const ol = $("boardList");
+  ol.innerHTML = save.top.length ? save.top.map((e, i) => `<li><span class="r">${i + 1}.</span><span style="flex:1;color:var(--dim)">LV ${e.lv}</span><span class="s">${e.s}</span></li>`).join("")
+    : '<div class="empty">No runs yet. Hit PLAY!</div>';
+  $("bestLine").innerHTML = save.best ? `YOUR BEST <b>${save.best}</b>` : "";
+  $("gemCount").textContent = "💎 " + save.gems;
+  $("skins").innerHTML = SKINS.map(s => {
+    const owned = save.owned.includes(s.id), on = save.skin === s.id;
+    return `<div class="skin ${on ? "on" : ""} ${owned ? "" : "locked"}" data-skin="${s.id}" role="button" tabindex="0">
+      <div class="dot" style="background:${s.fill};box-shadow:0 0 0 4px ${s.ring};opacity:${s.ghost ? .6 : 1}"></div>
+      ${on ? "ON" : owned ? s.name : "💎 " + s.price}</div>`;
+  }).join("");
+}
+$("skins").addEventListener("click", e => {
+  const el = e.target.closest(".skin"); if (!el) return;
+  const s = SKINS.find(x => x.id === el.dataset.skin);
+  if (save.owned.includes(s.id)) { save.skin = s.id; sfx.click(); }
+  else if (save.gems >= s.price) { save.gems -= s.price; save.owned.push(s.id); save.skin = s.id; sfx.gem(); }
+  else { beep(160, 0.15, "square", 0.05); el.animate([{ transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "none" }], 200); return; }
+  persist(); const idx = focusIdx; renderMenu(); focusIdx = idx; paintFocus();
+});
+function goMenu() { joy.finish(); setState("menu"); }
+function toggleMute() { save.muted = !save.muted; persist(); paintMute(); if (!save.muted) sfx.click(); }
+function paintMute() { for (const id of ["mute", "hudMute"]) { $(id).textContent = save.muted ? "✕" : "♪"; $(id).style.color = save.muted ? "var(--red)" : ""; } }
+const tap = (id, fn) => $(id).addEventListener("click", () => { sfx.click(); fn(); });
+tap("playBtn", startRun); tap("againBtn", startRun); tap("overMenuBtn", goMenu); tap("hudMenu", goMenu); tap("reviveBtn", revive);
+$("mute").addEventListener("click", toggleMute); $("hudMute").addEventListener("click", toggleMute);
+document.addEventListener("visibilitychange", () => { if (document.hidden && state === "playing") paused = true; });
+cv.addEventListener("pointerdown", e => { if (paused && e.pointerType !== "touch") paused = false; });
+window.addEventListener("resize", resize);
+
+// ---------------------------------------------------------------- loop
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  pollPad();
+  if (state === "playing" && !paused) update(dt);
+  else if (state === "over") { updateParticles(dt); shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt * 3); }
+  draw();
+  if (paused && state === "playing") { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "#0009"; ctx.fillRect(0, 0, vw, vh);
+    ctx.fillStyle = "#f2fffd"; ctx.font = "18px 'Press Start 2P', monospace"; ctx.textAlign = "center"; ctx.fillText("PAUSED", vw / 2, vh / 2 - 14);
+    ctx.font = "11px 'Press Start 2P', monospace"; ctx.fillStyle = "#8fb9b5"; ctx.fillText(inputMode === "touch" ? "TAP TO KEEP GOING" : inputMode === "pad" ? "PRESS A TO KEEP GOING" : "CLICK OR PRESS ANY KEY", vw / 2, vh / 2 + 18); }
+  requestAnimationFrame(frame);
+}
+paintMute();
+setState("menu");
+requestAnimationFrame(frame);
+
+// Store screenshots only: index.html#shot (gameplay) or #cover (gameplay + logo). Never used in normal play.
+if (location.hash === "#shot" || location.hash === "#cover") {
+  startRun(); t = levelStart(5) + 2; setLevel(5); addZoomer();
+  for (let i = 0; i < 260; i++) { inv = 99; target = { x: 500 + Math.cos(i / 40) * 260, y: 312 + Math.sin(i / 30) * 160 }; update(0.016); }
+  inv = 0; zoomers.forEach(z => z.warn = 0); gemsRun = 7; score = t * 10 + 7 * CFG.gemValue; updateHud(); popup(blip.x + 40, blip.y - 30, "+25", "#3ff2e6");
+  update = () => {};
+  $("hint").classList.add("hidden"); $("banner").style.opacity = 0;
+  if (location.hash === "#cover") {
+    $("hud").classList.add("hidden"); state = "menu"; demo = []; resize(); state = "playing";
+    const c = document.createElement("div");
+    c.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(#04110fcc 30%,#04110f55 75%);pointer-events:none";
+    c.innerHTML = '<h1 class="logo" style="font-size:64px">BLIP<br>PANIC</h1><p class="sub" style="font-size:20px;color:#f2fffd">Grab the gems. Dodge everything else.</p>';
+    document.body.appendChild(c);
+  }
+}
+</script>
+</body>
+</html>
