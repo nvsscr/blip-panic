@@ -85,7 +85,7 @@
   .hint { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: min(1.7vw, 3vh); }
   #menuCorner { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 12px; }
   #muteMenu { width: 62px; height: 56px; }
-  #deviceMenu, #fullMenu { height: 56px; font-size: 12px; }
+  #deviceMenu, #fullMenu, #ctlMenu { height: 56px; font-size: 12px; }
   #device { display: grid; place-items: center; background: rgba(6,20,32,.55); z-index: 30; }
   .pick { padding: 26px 30px 30px; text-align: center; width: min(640px, 100%); }
   .pick h2 { font-family: var(--title); color: var(--cyan); font-size: min(26px, 5vw); margin: 0 0 8px; }
@@ -161,7 +161,7 @@
   @media (max-height: 500px) {
     #menu { row-gap: 1vh; padding-top: max(1.5vh, env(safe-area-inset-top)); }
     #muteMenu { width: 48px; height: 44px; }
-    #deviceMenu, #fullMenu { height: 44px; font-size: 10px; } #menuCorner { gap: 8px; }
+    #deviceMenu, #fullMenu, #ctlMenu { height: 44px; font-size: 10px; } #menuCorner { gap: 8px; }
     .pick { padding: 14px 18px 18px; } .pick p { margin-bottom: 12px; font-size: 14px; }
     .pickRow .btn { height: 120px; } .pickRow svg { width: 36px; height: 36px; }
     .hudMain { height: 46px; gap: 10px; padding: 0 10px; }
@@ -220,6 +220,7 @@
   <div id="menuCorner">
     <button class="btn sec" id="muteMenu" aria-label="Sound" data-nav><span><canvas class="pix" data-sound style="height:24px"></canvas></span></button>
     <button class="btn sec" id="deviceMenu" data-nav><span id="deviceLabel">PC</span></button>
+    <button class="btn sec hidden" id="ctlMenu" data-nav><span id="ctlLabel">👆 DRAG</span></button>
     <button class="btn sec hidden" id="fullMenu" data-nav><span>⛶ FULLSCREEN</span></button>
   </div>
 </div>
@@ -294,7 +295,7 @@
 const rgb = (r, g, b) => [r, g, b];
 const W = 1000, H = 625;
 const A = { BlipRadius: 11, HitForgiveness: 3, FollowSharpness: 30, TrailLength: 10, SmallScreenBlipScale: 1.4 };
-const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 820, SmallScreen: 500 };
+const IN = { PadSpeed: 750, PadDeadzone: 0.2, PadCurve: 1.5, JoyZone: 0.4, JoyRadius: 0.14, JoyMin: 48, JoyMax: 90, JoyDeadzone: 0.12, JoySpeed: 520, DragGain: 1.3, SmallScreen: 500 };
 const LV = {
   Every: 8, SpeedEase: 1.5, BannerTime: 1.4,
   Levels: [
@@ -401,7 +402,7 @@ const stageFor = n => { let s = LV.Stages[0]; for (const x of LV.Stages) if (n >
 // save (this device only)
 // =====================================================================
 const SAVE_KEY = "blipPanic.v2";
-let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false, device: null };
+let save = { best: 0, top: [], gems: 0, skins: ["Classic"], themes: ["Ocean"], skin: "Classic", theme: "Ocean", muted: false, device: null, touchCtl: "drag" };
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
 const skinDef = () => SKINS.find(s => s.Id === save.skin) || SKINS[0];
@@ -467,7 +468,7 @@ function layout() {
     // [ joystick | arena | HUD column ]: the arena gets the full height
     const hr = $("hud").getBoundingClientRect(), right = hr.width ? hr.left : vw - 130;
     const insL = Math.max(8, parseFloat(getComputedStyle($("menu")).paddingLeft) || 0) - 4;
-    const joyW = joy.r * 2 + 28, p = 6;
+    const joyW = joy.fixed() ? joy.r * 2 + 28 : 0, p = 6;
     as = Math.min((vh - p * 2) / H, (right - p - joyW - insL) / W);
     const left = insL + joyW, free = right - p - left - W * as;
     ax = left + free / 2; ay = (vh - H * as) / 2;
@@ -904,7 +905,7 @@ function drawPause() {
 // =====================================================================
 const joy = {
   id: null, ox: 0, oy: 0, dx: 0, dy: 0, r: 60, alpha: 0, cx: 0, cy: 0,
-  fixed() { return save.device === "phone" && state !== "menu"; },
+  fixed() { return save.device === "phone" && save.touchCtl === "stick" && state !== "menu"; },
   fit() { this.r = this.fixed() ? clamp(Math.floor(vh * 0.2), 44, 80) : clamp(Math.floor(vh * IN.JoyRadius), IN.JoyMin, IN.JoyMax); },
   // phone mode: a fixed stick on the left, grabbed by any touch on the left side of the arena
   inZone(x) { return this.fixed() ? x < ax + W * as * 0.35 : x <= vw * IN.JoyZone; },
@@ -941,14 +942,33 @@ cv.addEventListener("pointerdown", e => {
   setInputMode("mouse"); mouseTarget = toArena(e.clientX, e.clientY);
   if (paused) paused = false;
 });
+// Phone "drag" control: put a finger down anywhere and slide it; the blip copies the finger's
+// movement (a bit amplified), even while the finger is outside the arena.
+const dragMode = () => save.device === "phone" && save.touchCtl !== "stick";
+const drag = { id: null, x: 0, y: 0 };
 cv.addEventListener("touchstart", e => {
   e.preventDefault(); setInputMode("touch");
   if (state !== "playing") return;
   if (paused) { paused = false; return; }
-  for (const t of e.changedTouches) if (!joy.active() && joy.inZone(t.clientX)) joy.begin(t.identifier, t.clientX, t.clientY);
+  for (const t of e.changedTouches) {
+    if (dragMode()) { if (drag.id === null) { drag.id = t.identifier; drag.x = t.clientX; drag.y = t.clientY; } }
+    else if (!joy.active() && joy.inZone(t.clientX)) joy.begin(t.identifier, t.clientX, t.clientY);
+  }
 }, { passive: false });
-cv.addEventListener("touchmove", e => { e.preventDefault(); for (const t of e.changedTouches) joy.move(t.identifier, t.clientX, t.clientY); }, { passive: false });
-const endTouch = e => { for (const t of e.changedTouches) joy.finish(t.identifier); };
+cv.addEventListener("touchmove", e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === drag.id) {
+      const k = IN.DragGain / as, r = A.BlipRadius;
+      if (state === "playing" && !paused && !G.dead) {
+        padTarget.x = clamp(padTarget.x + (t.clientX - drag.x) * k, r, W - r);
+        padTarget.y = clamp(padTarget.y + (t.clientY - drag.y) * k, r, H - r);
+      }
+      drag.x = t.clientX; drag.y = t.clientY;
+    } else joy.move(t.identifier, t.clientX, t.clientY);
+  }
+}, { passive: false });
+const endTouch = e => { for (const t of e.changedTouches) { if (t.identifier === drag.id) drag.id = null; joy.finish(t.identifier); } };
 cv.addEventListener("touchend", endTouch); cv.addEventListener("touchcancel", endTouch);
 document.addEventListener("touchstart", () => setInputMode("touch"), { passive: true, capture: true });
 
@@ -1121,7 +1141,7 @@ async function act(what) {
   }
 }
 function paintHints() {
-  const hint = inputMode === "touch" ? (save.device === "phone" ? "Left thumb = joystick • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
+  const hint = inputMode === "touch" ? (dragMode() ? "Drag anywhere to steer • grab 💎, dodge the rest" : "Left thumb = joystick • grab 💎, dodge the rest")
     : inputMode === "gamepad" ? "Left stick to steer • grab 💎, dodge the rest"
     : inputMode === "keys" ? "Arrow keys / WASD to steer • grab 💎, dodge the rest"
     : "Steer with your mouse • grab 💎, dodge the rest";
@@ -1248,6 +1268,7 @@ function setDevice(d) {
   save.device = d; persist();
   $("deviceLabel").textContent = d === "phone" ? "📱 PHONE" : "🖥 PC";
   document.body.classList.toggle("phone", d === "phone");
+  $("ctlMenu").classList.toggle("hidden", d !== "phone"); paintCtl();
   setInputMode(d === "phone" ? "touch" : "mouse");
   layout();
 }
@@ -1277,6 +1298,9 @@ function pick(d) { SFX.Click(); setDevice(d); $("device").classList.add("hidden"
 on("pickPhone", () => pick("phone"));
 on("pickPc", () => pick("pc"));
 on("deviceMenu", () => { SFX.Click(); showPicker(); });
+// Phone setting: drag anywhere (default) or a fixed joystick on the left
+function paintCtl() { $("ctlLabel").textContent = save.touchCtl === "stick" ? "🕹 JOYSTICK" : "👆 DRAG"; paintHints(); }
+on("ctlMenu", () => { SFX.Click(); save.touchCtl = save.touchCtl === "stick" ? "drag" : "stick"; persist(); joy.finish(); drag.id = null; paintCtl(); layout(); });
 CG.init().then(() => {
   if (!save.device && CG.ready) { // CrazyGames knows the device: don't add a click before play
     const t = CG.sdk.user && CG.sdk.user.systemInfo && CG.sdk.user.systemInfo.device && CG.sdk.user.systemInfo.device.type;
